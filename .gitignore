@@ -19,3 +19,6 @@
 
 # Go workspace file
 go.work
+
+# Make sure weights are not stored
+weights

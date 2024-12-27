@@ -1,0 +1,8 @@
+fastapi[standard]
+uvicorn
+pyyaml
+pyzmq
+torch
+torchaudio
+torchvision
+transformers

@@ -1,0 +1,151 @@
+import base64
+import json
+import logging
+import time
+from functools import lru_cache
+from typing import List
+
+import torch
+import zmq
+from torch.multiprocessing import Process
+from transformers import AutoModel, AutoTokenizer
+
+from .config import (
+    LOCAL,
+    LOG_LEVEL,
+    MODEL_DEVICE,
+    MODEL_NUM_WORKERS,
+    MODEL_PATH,
+    MODEL_TEXT_MAX_LENGTH,
+    MODEL_TEXT_SPLIT_OVERLAP,
+    MODEL_ZMQ_WORKER_ADDR,
+)
+
+# Setup logging
+logging.basicConfig(level=LOG_LEVEL)
+logger = logging.getLogger(__name__)
+
+
+# Load model and tokenizer globally (to save memory per worker)
+@lru_cache(maxsize=None)
+def load_model():
+    global device, tokenizer, model
+
+    logger.info("Loading model from %s...", MODEL_PATH)
+    device = torch.device(MODEL_DEVICE)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    model = AutoModel.from_pretrained(MODEL_PATH).to(device)
+
+
+def split_text(text: str, max_length: int, overlap: int) -> List[str]:
+    """Split text into smaller parts with overlap."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_length, len(text))
+        chunks.append(text[start:end])
+        start += max_length - overlap
+    return chunks
+
+
+def process_task(context: zmq.Context):
+    """Worker process for running inference."""
+    global device, tokenizer, model
+
+    load_model()
+
+    logger.info("Worker process started.")
+    socket = context.socket(zmq.REP)
+    socket.connect(MODEL_ZMQ_WORKER_ADDR)
+
+    while True:
+        # Receive request
+        identity, _, request = socket.recv_multipart()
+        logger.debug("Received request: %s", request)
+
+        try:
+            # Parse the request
+            data = json.loads(request)
+            text_items = data.get("text_items", [])
+
+            logger.debug(
+                "Received %s text items for inference.", len(text_items)
+            )
+
+            # Prepare input data for batch processing
+            all_chunks = []
+            metadata_map = []
+            for item in text_items:
+                text = item["text"]
+                metadata = item["metadata"]
+
+                # Split text if necessary
+                chunks = split_text(
+                    text, MODEL_TEXT_MAX_LENGTH, MODEL_TEXT_SPLIT_OVERLAP
+                )
+                all_chunks.extend(chunks)
+                metadata_map.extend([metadata] * len(chunks))
+
+            # Batch encode and process with the model
+            logger.debug("Processing %s chunks...", len(all_chunks))
+            encoded_input = tokenizer(
+                all_chunks, padding=True, truncation=True, return_tensors="pt"
+            ).to(device)
+            with torch.no_grad():
+                model_output = model(**encoded_input)
+
+            # Prepare results
+            logger.debug("Processing model output...")
+            vector_batch = model_output.last_hidden_state.cpu().numpy()
+            results = []
+            for i, vector in enumerate(vector_batch):
+                encoded_vector = base64.b64encode(
+                    vector.flatten().tobytes()
+                ).decode("utf-8")
+                results.append(
+                    {
+                        "text": all_chunks[i],
+                        "vector": encoded_vector,
+                        "metadata": metadata_map[i],
+                    }
+                )
+
+            logger.debug("Sending %s results...", len(results))
+            response = {"results": results}
+        except Exception as e:
+            logger.exception("Error processing task.")
+            response = {"error": str(e)}
+
+        socket.send_multipart(
+            [identity, b"", json.dumps(response).encode("utf-8")]
+        )
+
+
+def inference_server():
+    """Start the inference server."""
+    # Setup ZMQ context
+    context = zmq.Context()
+
+    # Start worker processes
+    workers = []
+    for _ in range(MODEL_NUM_WORKERS):
+        worker = Process(target=process_task, args=(context,), daemon=not LOCAL)
+        worker.start()
+        workers.append(worker)
+
+    try:
+        while True:
+            if not all(worker.is_alive() for worker in workers):
+                logger.error("Worker process has exited.")
+                raise RuntimeError("Worker process has exited.")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received. Terminating workers...")
+    except RuntimeError:
+        logger.error("Worker process has exited. Terminating workers...")
+    finally:
+        for worker in workers:
+            if worker.is_alive():
+                worker.terminate()
+                worker.join()
+        context.term()
