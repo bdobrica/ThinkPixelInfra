@@ -11,10 +11,10 @@ COPY api_gateway/go.mod api_gateway/go.sum ./
 RUN go mod download
 
 # Copy the rest of the source code
-COPY api_gateway/. .
+COPY api_gateway/. ./
 
 # Build the Go application as a static binary
-RUN go build -o api_gateway main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api_gateway main.go
 
 # Stage 2: Create the runtime image
 FROM alpine:3.21
@@ -32,4 +32,4 @@ COPY --from=build /app/api_gateway .
 EXPOSE 8080
 
 # Command to run the application
-CMD ["./api_gateway"]
+ENTRYPOINT ["/app/api_gateway"]

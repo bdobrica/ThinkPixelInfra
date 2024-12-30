@@ -2,7 +2,7 @@ services:
   redis-primary:
     image: redis/redis-stack:latest
     container_name: redis-primary
-    command: [ "redis-server", "--appendonly", "yes" ]
+    command: [ "redis-stack-server", "--appendonly", "yes", "--protected-mode", "no" ]
     ports:
       - "6379:6379"
     volumes:
@@ -11,7 +11,7 @@ services:
   redis-replica:
     image: redis/redis-stack:latest
     container_name: redis-replica
-    command: [ "redis-server", "--appendonly", "yes", "--replicaof", "redis-primary", "6379" ]
+    command: [ "redis-stack-server", "--appendonly", "yes", "--replicaof", "redis-primary", "6379", "--protected-mode", "no" ]
     depends_on:
       - redis-primary
     ports:
@@ -20,47 +20,55 @@ services:
       - redis-replica-data:/data
 
   redis-sentinel:
-    image: redis:7.0.12
+    build:
+      context: ../docker/sentinel
+      dockerfile: Dockerfile
     container_name: redis-sentinel
-    command: [ "redis-sentinel", "/etc/sentinel.conf" ]
     ports:
       - "26379:26379"
-    volumes:
-      - ./sentinel.conf:/etc/sentinel.conf
     depends_on:
       - redis-primary
       - redis-replica
 
-  modnetv2:
+  model:
     build:
-      context: ../docker/modnetv2
-      dockerfile: ../docker/modnetv2/Dockerfile
-    container_name: modnetv2
+      context: ../docker/model
+      dockerfile: Dockerfile
+    container_name: model
+    volumes:
+      - ../docker/model/weights/mpnetv2/mpnet-base-v2:/app/mpnet-base-v2
     ports:
-      - "8080:8080"
-  
+      - "8000:8000"
+    environment:
+      - LOCAL=1
+
   mysql:
     image: mysql:8.0
     container_name: mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: modnetv2
-      MYSQL_USER: modnetv2
-      MYSQL_PASSWORD: modnetv2
+      MYSQL_DATABASE: thinkpixel
+      MYSQL_USER: thinkpixel
+      MYSQL_PASSWORD: thinkpixel
+    volumes:
+      - mysql-data:/var/lib/mysql
     ports:
       - "3306:3306"
 
   api-gateway:
     build:
-      context: ../docker/api-gateway
-      dockerfile: ../docker/api-gateway/Dockerfile
+      context: ../docker/api_gateway
+      dockerfile: Dockerfile
     container_name: api-gateway
+    environment:
+      - LOCAL=1
     ports:
       - "8081:8081"
     depends_on:
-      - modnetv2
+      - model
       - redis-sentinel
 
 volumes:
   redis-primary-data:
   redis-replica-data:
+  mysql-data:

@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from functools import lru_cache
-from typing import List
+from typing import Any, List
 
 import torch
 import zmq
@@ -46,6 +46,23 @@ def split_text(text: str, max_length: int, overlap: int) -> List[str]:
         chunks.append(text[start:end])
         start += max_length - overlap
     return chunks
+
+
+def mean_pooling(
+    token_embeddings: torch.Tensor, attention_mask: Any
+) -> torch.Tensor:
+    """
+    Mean Pooling - Take attention mask into account for correct averaging
+    :param model_output: Model output
+    :param attention_mask: Attention mask
+    :return: Mean pooled vector
+    """
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+    sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+    return sum_embeddings / sum_mask
 
 
 def process_task(context: zmq.Context):
@@ -93,10 +110,19 @@ def process_task(context: zmq.Context):
             ).to(device)
             with torch.no_grad():
                 model_output = model(**encoded_input)
+                pooled_output = mean_pooling(
+                    model_output.last_hidden_state,
+                    encoded_input["attention_mask"],
+                )
 
             # Prepare results
             logger.debug("Processing model output...")
-            vector_batch = model_output.last_hidden_state.cpu().numpy()
+            vector_batch = pooled_output.cpu().numpy()
+            logger.debug(
+                "Model output shape: %s, dtype: %s",
+                vector_batch.shape,
+                vector_batch.dtype,
+            )
             results = []
             for i, vector in enumerate(vector_batch):
                 encoded_vector = base64.b64encode(
