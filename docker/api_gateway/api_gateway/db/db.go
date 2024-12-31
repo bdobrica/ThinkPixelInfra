@@ -61,9 +61,9 @@ func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
 	var maxSearchResults int
 	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("database query error")
+		return 0, "", time.Time{}, 0, errors.New("Database query error")
 	}
 
 	return id, redisServer, expiresAt.Time, maxSearchResults, nil
@@ -89,9 +89,9 @@ func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, int, error) {
 	var maxSearchResults int
 	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("database query error")
+		return 0, "", time.Time{}, 0, errors.New("Database query error")
 	}
 
 	return id, redisServer, expiresAt.Time, maxSearchResults, nil
