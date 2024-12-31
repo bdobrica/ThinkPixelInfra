@@ -34,7 +34,7 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	var host, port, masterName string
 	_, err := fmt.Sscanf(redisServer, "%s:%s/%s", &host, &port, &masterName)
 	if err != nil {
-		return nil, fmt.Errorf("invalid RedisServer format: %s", redisServer)
+		return nil, fmt.Errorf("Invalid RedisServer format: %s", redisServer)
 	}
 
 	sentinelAddr := fmt.Sprintf("%s:%s", host, port)
@@ -52,7 +52,7 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err := client.Ping(ctx).Result(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis Sentinel at %s: %w", sentinelAddr, err)
+		return nil, fmt.Errorf("Failed to connect to Redis Sentinel at %s: %w", sentinelAddr, err)
 	}
 
 	return client, nil
@@ -86,7 +86,7 @@ func getRedisClient(redisServer string) (*redis.Client, error) {
 
 	client, err := initializeRedisClient(redisServer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Redis client for %s: %w", redisServer, err)
+		return nil, fmt.Errorf("Failed to create Redis client for %s: %w", redisServer, err)
 	}
 
 	// Cache the new client with expiration
@@ -108,7 +108,7 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 	
 	client, err := getRedisClient(redisServer)
 	if err != nil {
-		return storedCount, fmt.Errorf("failed to get Redis client: %w", err)
+		return storedCount, fmt.Errorf("Failed to get Redis client: %w", err)
 	}
 
 	// Check if the FT index exists
@@ -125,7 +125,7 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 			"DISTANCE_METRIC", "COSINE", // Cosine distance for similarity
 		).Result(); err != nil {
 			logger.Errorf("Error creating FT index: %v", err)
-			return storedCount, fmt.Errorf("failed to create FT index: %w", err)
+			return storedCount, fmt.Errorf("Failed to create FT index: %w", err)
 		}
 	}
 
@@ -134,7 +134,7 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 		embeddingBytes, err := base64.StdEncoding.DecodeString(emb.Embedding)
 		if err != nil {
 			logger.Errorf("Error decoding embedding for ID %d: %v", emb.ID, err)
-			return storedCount, fmt.Errorf("failed to decode embedding: %w", err)
+			return storedCount, fmt.Errorf("Failed to decode embedding: %w", err)
 		}
 
 		fields := map[string]interface{}{
@@ -149,7 +149,7 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 
 		if _, err := client.HSet(ctx, key, fields).Result(); err != nil {
 			logger.Errorf("Error storing document with key %s: %v", key, err)
-			return storedCount, fmt.Errorf("failed to store document: %w", err)
+			return storedCount, fmt.Errorf("Failed to store document: %w", err)
 		}
 		storedCount++
 	}
@@ -168,14 +168,14 @@ func SearchEmbeddings(siteId int, redisServer string, embeddings []model.Embeddi
 	
 	client, err := getRedisClient(redisServer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Redis client: %w", err)
+		return nil, fmt.Errorf("Failed to get Redis client: %w", err)
 	}
 
 	for _, emb := range embeddings {
 		embeddingBytes, err := base64.StdEncoding.DecodeString(emb.Embedding)
 		if err != nil {
 			logger.Errorf("Error decoding embedding: %v", err)
-			return nil, fmt.Errorf("failed to decode embedding: %w", err)
+			return nil, fmt.Errorf("Failed to decode embedding: %w", err)
 		}
 
 		logger.Debugf("Performing search for embedding with size %d bytes", len(embeddingBytes))
@@ -189,13 +189,13 @@ func SearchEmbeddings(siteId int, redisServer string, embeddings []model.Embeddi
 		searchResults, err := cmd.Result()
 		if err != nil {
 			logger.Errorf("Error executing search query: %v", err)
-			return nil, fmt.Errorf("failed to execute search query: %w", err)
+			return nil, fmt.Errorf("Failed to execute search query: %w", err)
 		}
 		
 		resultsArray, ok := searchResults.([]interface{})
 		if !ok {
 			logger.Errorf("Unexpected search result format: %v", searchResults)
-			return nil, fmt.Errorf("unexpected search result format")
+			return nil, fmt.Errorf("Unexpected search result format")
 		}
 			
 		// Process results

@@ -64,7 +64,7 @@ func GetEmbeddings(textItems []TextItem) ([]EmbeddingResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("model API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("Model API returned status %d", resp.StatusCode)
 	}
 
 	var inferenceResponse InferenceResponse

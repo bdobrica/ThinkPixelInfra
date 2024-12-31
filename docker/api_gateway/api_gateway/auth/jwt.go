@@ -2,7 +2,7 @@ package auth
 
 import (
 	"time"
-	"fmt"
+	"errors"
 
 	"github.com/golang-jwt/jwt/v4"
 	"api_gateway/config"
@@ -48,5 +48,5 @@ func DecodeJWT(tokenString string) (string, error) {
 		hashedKey := claims["hashed_key"].(string)
 		return hashedKey, nil
 	}
-	return "", fmt.Errorf("invalid token")
+	return "", errors.New("Invalid token")
 }
