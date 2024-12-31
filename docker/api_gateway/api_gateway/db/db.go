@@ -42,14 +42,14 @@ func CloseDBConnection() error {
 }
 
 // GetAPIKeyDetails retrieves API key details from the database
-func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, error) {
+func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
-		return 0, "", time.Time{}, err
+		return 0, "", time.Time{}, 0, err
 	}
 
 	query := `
-		SELECT id, redis_server, expires_at
+		SELECT id, redis_server, expires_at, max_search_results
 		FROM wp_api_keys
 		WHERE api_key = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
@@ -58,21 +58,22 @@ func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, error) {
 	var id int
 	var redisServer string
 	var expiresAt sql.NullTime
-	if err := row.Scan(&id, &redisServer, &expiresAt); err != nil {
+	var maxSearchResults int
+	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, errors.New("invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, errors.New("database query error")
+		return 0, "", time.Time{}, 0, errors.New("database query error")
 	}
 
-	return id, redisServer, expiresAt.Time, nil
+	return id, redisServer, expiresAt.Time, maxSearchResults, nil
 }
 
 // GetAPIKeyDetailsByID retrieves API key details from the database by API Key ID
-func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, error) {
+func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, int, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
-		return 0, "", time.Time{}, err
+		return 0, "", time.Time{}, 0, err
 	}
 
 	query := `
@@ -85,12 +86,13 @@ func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, error) {
 	var id int
 	var redisServer string
 	var expiresAt sql.NullTime
-	if err := row.Scan(&id, &redisServer, &expiresAt); err != nil {
+	var maxSearchResults int
+	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, errors.New("invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, errors.New("database query error")
+		return 0, "", time.Time{}, 0, errors.New("database query error")
 	}
 
-	return id, redisServer, expiresAt.Time, nil
+	return id, redisServer, expiresAt.Time, maxSearchResults, nil
 }

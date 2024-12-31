@@ -15,89 +15,108 @@ import (
 	"api_gateway/logger"
 )
 
-var (
-	redisClient *redis.Client
-	redisMaster string
-	redisMu     sync.Mutex
-)
-
-// initializeRedisClient connects to the Redis Sentinel service to determine the current master
-func initializeRedisClient() error {
-    logger.Debugf("Initializing Redis client via Sentinel")
-
-    // Sentinel address and options
-    sentinelAddr := config.GetEnv("REDIS_SENTINEL_ADDR", "redis-sentinel:26379")
-    sentinelClient := redis.NewFailoverClient(&redis.FailoverOptions{
-        MasterName:    "mymaster",
-        SentinelAddrs: []string{sentinelAddr},
-        DialTimeout:   5 * time.Second,
-        ReadTimeout:   5 * time.Second,
-        WriteTimeout:  5 * time.Second,
-    })
-
-	logger.Debugf("Connecting to Redis Sentinel at %s", sentinelAddr)
-
-    // Test connection to Sentinel
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-
-    if _, err := sentinelClient.Ping(ctx).Result(); err != nil {
-        logger.Errorf("Failed to connect to Redis Sentinel: %v", err)
-        return fmt.Errorf("failed to connect to Redis Sentinel: %w", err)
-    }
-
-    // Update the redisClient to point to the master
-    redisClient = sentinelClient
-    redisMaster = sentinelAddr
-
-	logger.Debugf("Redis client initialized with master: %s", redisMaster)
-
-    return nil
+type redisClientCacheEntry struct {
+	client     *redis.Client
+	expiresAt  time.Time
 }
 
-// getRedisClient ensures the Redis client is valid or reconnects if necessary
-func getRedisClient() (*redis.Client, error) {
-    redisMu.Lock()
-    defer redisMu.Unlock()
+var (
+	clientCache     sync.Map // Cache of Redis clients
+	defaultTTL      = time.Hour
+	ttlFromEnv, _   = strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
+	clientCacheTTL  = time.Duration(ttlFromEnv) * time.Second
+	clientCacheLock sync.Mutex
+)
 
-    if redisClient == nil {
-		logger.Debugf("Redis client not initialized, initializing...")
-        // Call initializeRedisClient without acquiring the lock again
-        if err := initializeRedisClient(); err != nil {
-            return nil, err
-        }
-    } else {
-        if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
-            logger.Errorf("Error pinging Redis master: %v", err)
-			logger.Debugf("Reinitializing Redis client...")
-            // Call initializeRedisClient without acquiring the lock again
-            if err := initializeRedisClient(); err != nil {
-                return nil, fmt.Errorf("failed to reconnect to Redis master: %w", err)
-            }
-        }
-    }
+// initializeRedisClient initializes a new Redis client based on RedisServer string
+func initializeRedisClient(redisServer string) (*redis.Client, error) {
+	// Parse RedisServer string
+	var host, port, masterName string
+	_, err := fmt.Sscanf(redisServer, "%s:%s/%s", &host, &port, &masterName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RedisServer format: %s", redisServer)
+	}
 
-	logger.Debugf("Redis client is healthy")
+	sentinelAddr := fmt.Sprintf("%s:%s", host, port)
 
-    return redisClient, nil
+	// Create Redis Failover Client
+	client := redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:    masterName,
+		SentinelAddrs: []string{sentinelAddr},
+		DialTimeout:   5 * time.Second,
+		ReadTimeout:   5 * time.Second,
+		WriteTimeout:  5 * time.Second,
+	})
+
+	// Test connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := client.Ping(ctx).Result(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis Sentinel at %s: %w", sentinelAddr, err)
+	}
+
+	return client, nil
+}
+
+// getRedisClient retrieves or creates a Redis client for a given RedisServer string
+func getRedisClient(redisServer string) (*redis.Client, error) {
+	// Check cache for existing client
+	if entry, ok := clientCache.Load(redisServer); ok {
+		cacheEntry := entry.(redisClientCacheEntry)
+		if time.Now().Before(cacheEntry.expiresAt) {
+			// Valid client found in cache
+			return cacheEntry.client, nil
+		}
+		// Expired client, remove it
+		clientCache.Delete(redisServer)
+	}
+
+	// Create a new client
+	clientCacheLock.Lock()
+	defer clientCacheLock.Unlock()
+
+	// Double-check to avoid race condition
+	if entry, ok := clientCache.Load(redisServer); ok {
+		cacheEntry := entry.(redisClientCacheEntry)
+		if time.Now().Before(cacheEntry.expiresAt) {
+			return cacheEntry.client, nil
+		}
+		clientCache.Delete(redisServer)
+	}
+
+	client, err := initializeRedisClient(redisServer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Redis client for %s: %w", redisServer, err)
+	}
+
+	// Cache the new client with expiration
+	clientCache.Store(redisServer, redisClientCacheEntry{
+		client:    client,
+		expiresAt: time.Now().Add(clientCacheTTL),
+	})
+
+	return client, nil
 }
 
 // StoreEmbeddings stores embeddings and associated metadata in Redis
-func StoreEmbeddings(embeddings []model.EmbeddingResponse) (int, error) {
+func StoreEmbeddings(siteID int, redisServer string, embeddings []model.EmbeddingResponse) (int, error) {
 	ctx := context.Background()
 	storedCount := 0
-	prefix := "document:"
-
-	client, err := getRedisClient()
+	prefix := fmt.Sprintf("%d:", siteID)
+	indexName := fmt.Sprintf("index:%d", siteID)
+	logger.Debugf("Storing %d embeddings with prefix %s in index %s", len(embeddings), prefix, indexName)
+	
+	client, err := getRedisClient(redisServer)
 	if err != nil {
 		return storedCount, fmt.Errorf("failed to get Redis client: %w", err)
 	}
 
 	// Check if the FT index exists
-	if _, err := client.Do(ctx, "FT.INFO", "index_name").Result(); err != nil {
-		logger.Debugf("FT index does not exist, creating...")
-		if _, err := client.Do(ctx, "FT.CREATE", "index_name",
+	if _, err := client.Do(ctx, "FT.INFO", indexName).Result(); err != nil {
+		logger.Debugf("FT index %s does not exist, creating...", indexName)
+		if _, err := client.Do(ctx, "FT.CREATE", indexName,
 			"ON", "HASH",           // Indicate indexing on Redis hashes
+			"PREFIX", "1", prefix,  // Use prefix for document keys
 			"SCHEMA",               // Define schema for the index
 			"embedding", "VECTOR",  // Define the vector field
 			"FLAT", "6",            // Use FLAT index for vector search
@@ -141,11 +160,13 @@ func StoreEmbeddings(embeddings []model.EmbeddingResponse) (int, error) {
 }
 
 // SearchEmbeddings performs ANN search for a set of embeddings and returns top results
-func SearchEmbeddings(embeddings []model.EmbeddingResponse, limit int) ([]map[string]interface{}, error) {
+func SearchEmbeddings(siteId int, redisServer string, embeddings []model.EmbeddingResponse, limit int) ([]map[string]interface{}, error) {
 	ctx := context.Background()
 	results := []map[string]interface{}{}
-
-	client, err := getRedisClient()
+	indexName := fmt.Sprintf("index:%d", siteId)
+	logger.Debugf("Searching embeddings in index %s", indexName)
+	
+	client, err := getRedisClient(redisServer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Redis client: %w", err)
 	}
@@ -159,7 +180,7 @@ func SearchEmbeddings(embeddings []model.EmbeddingResponse, limit int) ([]map[st
 
 		logger.Debugf("Performing search for embedding with size %d bytes", len(embeddingBytes))
 
-		cmd := client.Do(ctx, "FT.SEARCH", "index_name",
+		cmd := client.Do(ctx, "FT.SEARCH", indexName,
 			fmt.Sprintf("*=>[KNN %d @embedding $query_vec AS score]", limit),
 			"PARAMS", "2", "query_vec", embeddingBytes,
 			"SORTBY", "score",
@@ -217,6 +238,11 @@ func SearchEmbeddings(embeddings []model.EmbeddingResponse, limit int) ([]map[st
 					continue
 				}
 			}
+			if score < 0 {
+				score = 0 - score // Negative scores are not allowed
+			}
+			// Convert score to a percentage
+			score = 100 * (1 - score)
 
 			// Add the processed document to results
 			results = append(results, map[string]interface{}{

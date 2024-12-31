@@ -11,9 +11,10 @@ import (
 
 // CacheEntry represents an in-memory cache entry for an API key
 type CacheEntry struct {
-	ID          int
-	RedisServer string
-	ExpiresAt   time.Time
+	ID          		int
+	RedisServer 		string
+	ExpiresAt   		time.Time
+	MaxSearchResults	int
 }
 
 // KeyCache stores valid API keys in-memory
@@ -43,7 +44,7 @@ func GetCachedAPIKeyData(hashedKey string) (CacheEntry, error) {
 	}
 
 	// Query the database if not in cache
-	id, redisServer, expiresAt, err := db.GetAPIKeyDetails(hashedKey)
+	id, redisServer, expiresAt, maxSearchResults, err := db.GetAPIKeyDetails(hashedKey)
 	if err != nil {
 		return CacheEntry{}, err
 	}
@@ -53,6 +54,7 @@ func GetCachedAPIKeyData(hashedKey string) (CacheEntry, error) {
 		ID:          id,
 		RedisServer: redisServer,
 		ExpiresAt:   expiresAt,
+		MaxSearchResults: maxSearchResults,
 	}
 	KeyCache.Lock.Lock()
 	KeyCache.Data[hashedKey] = cacheEntry

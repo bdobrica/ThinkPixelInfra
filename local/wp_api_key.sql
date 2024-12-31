@@ -13,9 +13,11 @@ CREATE TABLE IF NOT EXISTS `wp_api_keys` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Last update timestamp
     `expires_at` DATETIME DEFAULT NULL, -- Optional expiration date for the key
     `verified_at` DATETIME DEFAULT NULL, -- Timestamp when verification was completed
+    `jwt_ttl` INT NOT NULL DEFAULT 900, -- Time-to-live for JWT tokens in seconds
     `redis_server` VARCHAR(255) DEFAULT NULL, -- Pointer to the allocated Redis server
     `estimated_pages` INT DEFAULT NULL, -- Estimated number of pages on the website
     `average_page_size` INT DEFAULT NULL, -- Estimated average size of text content in bytes for a page
+    `max_search_results` INT NOT NULL DEFAULT 20, -- Maximum number of search results to return
     UNIQUE KEY `unique_domain_path` (`domain`, `path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -33,9 +35,11 @@ INSERT INTO `wp_api_keys` (
     `updated_at`,
     `expires_at`,
     `verified_at`,
+    `jwt_ttl`,
     `redis_server`,
     `estimated_pages`,
-    `average_page_size`
+    `average_page_size`,
+    `max_search_results`
 ) VALUES (
     '66abcaac22ec1c4c5bc411be18013d3ca5cb4641de91754e95c63b9036d7c984', -- Example hashed API key
     'example.com', -- Full domain
@@ -50,7 +54,9 @@ INSERT INTO `wp_api_keys` (
     NOW(), -- Current timestamp for last update
     NULL, -- No expiration date
     NOW(), -- Current timestamp for verification completion
-    'redis-cluster-1.example.com', -- Redis server pointer
+    900, -- JWT tokens expire after 900 seconds
+    'redis-sentinel:26379/mymaster', -- Redis server pointer <host>:<port>/<master_name>
     500, -- Estimated 500 pages on the website
-    2048 -- Estimated 2048 bytes per page of text content
+    2048, -- Estimated 2048 bytes per page of text content
+    20 -- Maximum of 20 search results per request
 );

@@ -65,7 +65,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case embeddings := <-responseChan:
-		storedCount, err := redisconn.StoreEmbeddings(embeddings)
+		storedCount, err := redisconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.RedisServer, embeddings)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error storing documents: "+err.Error())
 			return
