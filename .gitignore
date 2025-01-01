@@ -22,3 +22,11 @@ go.work
 
 # Make sure weights are not stored
 weights
+
+# Terraform & terragrunt files
+.terraform
+.terragrunt-cache
+
+# Ignore the secrets file
+.secrets.hcl
+*.key
