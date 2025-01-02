@@ -15,6 +15,8 @@
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_load_balancer"></a> [load\_balancer](#module\_load\_balancer) | ../../load-balancer | n/a |
+| <a name="module_master_user_data"></a> [master\_user\_data](#module\_master\_user\_data) | ../../user-data | n/a |
+| <a name="module_replica_user_data"></a> [replica\_user\_data](#module\_replica\_user\_data) | ../../user-data | n/a |
 
 ## Resources
 

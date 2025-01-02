@@ -18,6 +18,7 @@ module "master" {
 module "worker" {
   source = "./worker"
 
+  cluster_domain            = var.cluster_domain
   name_prefix               = format("%s-worker", var.cluster_prefix)
   network                   = var.network
   subnet                    = var.subnet

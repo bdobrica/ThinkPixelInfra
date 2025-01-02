@@ -3,7 +3,7 @@ output "nodes" {
 }
 
 output "ip" {
-    value = var.servers > 1 ? module.load_balancer.ip : hcloud_server.this[0].ipv4_address
+    value = var.servers > 1 ? module.load_balancer.ip : local.master_ip
 }
 
 output "first_ip" {

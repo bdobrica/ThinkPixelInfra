@@ -5,11 +5,11 @@ terraform {
 locals {
     secrets = read_terragrunt_config(".secrets.hcl")
     ssh_keys = {
-        master_public_ssh_key = trimspace(file(".master.key.pub"))
-        master_private_ssh_key = trimspace(file(".master.key"))
-        worker_public_ssh_key = trimspace(file(".worker.key.pub"))
-        worker_private_ssh_key = trimspace(file(".worker.key"))
-        management_public_ssh_key = trimspace(file(".management.key.pub"))
+        master_public_ssh_key = file(".master.key.pub")
+        master_private_ssh_key = file(".master.key")
+        worker_public_ssh_key = file(".worker.key.pub")
+        worker_private_ssh_key = file(".worker.key")
+        management_public_ssh_key = file(".management.key.pub")
     }
 }
 

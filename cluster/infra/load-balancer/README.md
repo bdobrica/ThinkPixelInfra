@@ -22,11 +22,13 @@ No modules.
 | [hcloud_load_balancer_network.this](https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs/resources/load_balancer_network) | resource |
 | [hcloud_load_balancer_service.this](https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs/resources/load_balancer_service) | resource |
 | [hcloud_load_balancer_target.this](https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs/resources/load_balancer_target) | resource |
+| [hcloud_managed_certificate.this](https://registry.terraform.io/providers/hetznercloud/hcloud/latest/docs/resources/managed_certificate) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_domain_names"></a> [domain\_names](#input\_domain\_names) | The list of domain names to listen on | `list(string)` | n/a | yes |
 | <a name="input_location"></a> [location](#input\_location) | The location of the load balancer | `string` | `"fsn1"` | no |
 | <a name="input_name"></a> [name](#input\_name) | The name of the load balancer | `any` | n/a | yes |
 | <a name="input_network"></a> [network](#input\_network) | The network to attach the load balancer to | `any` | n/a | yes |

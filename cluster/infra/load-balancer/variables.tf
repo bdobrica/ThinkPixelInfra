@@ -25,3 +25,8 @@ variable "protocols" {
   type        = set(string)
   default     = ["http", "https"]
 }
+
+variable "domain_names" {
+  description = "The list of domain names to listen on"
+  type        = list(string)
+}

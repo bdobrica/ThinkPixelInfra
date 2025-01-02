@@ -1,11 +1,15 @@
 # Configure the Hetzner Cloud Provider with your token
+terraform {
+  required_version = ">= 1.10.0"
+}
 provider "hcloud" {
   token = var.hcloud_token
 }
 
 module "network" {
-  source = "./networking"
-  name   = format("%s-net", var.cluster_prefix)
+  source   = "./networking"
+  name     = format("%s-net", var.cluster_prefix)
+  location = var.location
 }
 
 module "k8s" {

@@ -12,7 +12,9 @@
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_locations"></a> [locations](#module\_locations) | ../locations | n/a |
 
 ## Resources
 
@@ -25,6 +27,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_location"></a> [location](#input\_location) | The location of the network | `string` | `"fsn1"` | no |
 | <a name="input_name"></a> [name](#input\_name) | The name of the cluster network | `string` | n/a | yes |
 
 ## Outputs

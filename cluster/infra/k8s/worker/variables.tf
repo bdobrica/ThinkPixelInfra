@@ -1,3 +1,9 @@
+variable "cluster_domain" {
+    description = "The domain name of the cluster"
+    default = "cluster.local"
+    type = string
+}
+
 variable "name_prefix" {
     description = "The name prefix of the worker nodes. It will have the format <name_prefix>-<index>"
     default = "worker"

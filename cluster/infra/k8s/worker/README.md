@@ -15,6 +15,7 @@
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_load_balancer"></a> [load\_balancer](#module\_load\_balancer) | ../../load-balancer | n/a |
+| <a name="module_worker_user_data"></a> [worker\_user\_data](#module\_worker\_user\_data) | ../../user-data | n/a |
 
 ## Resources
 
@@ -26,6 +27,7 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_cluster_domain"></a> [cluster\_domain](#input\_cluster\_domain) | The domain name of the cluster | `string` | `"cluster.local"` | no |
 | <a name="input_location"></a> [location](#input\_location) | The location to create the worker nodes | `string` | `"fsn1"` | no |
 | <a name="input_management_public_ssh_key"></a> [management\_public\_ssh\_key](#input\_management\_public\_ssh\_key) | The public SSH key to use for management access | `string` | n/a | yes |
 | <a name="input_master_ip"></a> [master\_ip](#input\_master\_ip) | The IP address of the master node or load balancer to master nodes | `any` | n/a | yes |
