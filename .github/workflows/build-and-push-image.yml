@@ -20,7 +20,17 @@ jobs:
       - name: Detect Changes in .bumpversion.cfg Files
         id: changes
         run: |
-          git diff --name-only ${{ github.event.before }} ${{ github.sha }} > changed_files.txt
+          # Determine the commit range for git diff
+          if [ -z "${{ github.event.before }}" ] || ! git cat-file -e "${{ github.event.before }}"; then
+            echo "No valid previous commit, using HEAD~1"
+            commit_range="HEAD~1"
+          else
+            echo "Using github.event.before"
+            commit_range="${{ github.event.before }}..${{ github.sha }}"
+          fi
+
+          echo "Comparing changes in range: $commit_range"
+          git diff --name-only $commit_range > changed_files.txt
           grep -E '^docker/.*/\.bumpversion\.cfg$' changed_files.txt > changed_cfgs.txt || true
           cat changed_cfgs.txt
 
