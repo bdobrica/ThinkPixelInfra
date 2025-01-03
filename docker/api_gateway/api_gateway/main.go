@@ -27,5 +27,5 @@ func main() {
 
 	// Start Server
 	logger.Infof("API Gateway is running on port 8080")
-	logger.Fatalf(http.ListenAndServe(":8080", r))
+	logger.Fatalf("API Gateway failed to start: %v", http.ListenAndServe(":8080", r))
 }
