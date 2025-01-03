@@ -1,0 +1,61 @@
+name: Conditional Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Detect Changes in .bumpversion.cfg Files
+        id: changes
+        run: |
+          git diff --name-only ${{ github.event.before }} ${{ github.sha }} > changed_files.txt
+          grep -E '^docker/.*/\.bumpversion\.cfg$' changed_files.txt > changed_cfgs.txt || true
+          cat changed_cfgs.txt
+
+      - name: Skip Build if No Changes
+        if: failure()
+        run: |
+          if [[ ! -s changed_cfgs.txt ]]; then
+            echo "No changes in .bumpversion.cfg files. Skipping build."
+            exit 0
+          fi
+
+      - name: Set up Quay.io Authentication
+        run: |
+          echo '{ "auths": { "quay.io": { "auth": "${{ secrets.QUAY_AUTH }}", "email": "" } } }' > $HOME/.docker/config.json
+
+      - name: Set up QEMU for Multiarch Builds
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and Push Changed Images
+        run: |
+          while IFS= read -r cfg_file; do
+            folder=$(dirname $cfg_file)
+            version=$(grep -Po 'current_version = \K[\d.]+' "$cfg_file")
+
+            echo "Building and pushing image for $folder with version $version..."
+
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --file "$folder/Dockerfile" \
+              --tag "quay.io/${{ secrets.QUAY_USERNAME }}/thinkpixel-$(basename $folder | tr '_' '-')-multi:$version" \
+              --tag "quay.io/${{ secrets.QUAY_USERNAME }}/thinkpixel-$(basename $folder | tr '_' '-')-multi:latest" \
+              "$folder" --push
+          done < changed_cfgs.txt

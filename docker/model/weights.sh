@@ -1,17 +1,16 @@
-#!/bin/bash
+#!/bin/sh
 
 # Define the base URL
 BASE_URL="https://ublo.ro/wp-content/mirror"
 
 # Define the files to download
-FILES=(
-    "mpnetv2/mpnet-base-v2/config.json"
-    "mpnetv2/mpnet-base-v2/pytorch_model.bin"
-    "mpnetv2/mpnet-base-v2/sentencepiece.bpe.model"
-    "mpnetv2/mpnet-base-v2/special_tokens_map.json"
-    "mpnetv2/mpnet-base-v2/tokenizer_config.json"
-    "mpnetv2/mpnet-base-v2/tokenizer.json"
-)
+FILES="\
+mpnetv2/mpnet-base-v2/config.json \
+mpnetv2/mpnet-base-v2/pytorch_model.bin \
+mpnetv2/mpnet-base-v2/sentencepiece.bpe.model \
+mpnetv2/mpnet-base-v2/special_tokens_map.json \
+mpnetv2/mpnet-base-v2/tokenizer_config.json \
+mpnetv2/mpnet-base-v2/tokenizer.json"
 
 # Create the weights folder if it doesn't exist
 WEIGHTS_DIR="weights"
@@ -21,7 +20,7 @@ if [ ! -d "$WEIGHTS_DIR" ]; then
 fi
 
 # Download each file
-for FILE in "${FILES[@]}"; do
+for FILE in $FILES; do
     # Create subdirectories if needed
     DIR="$WEIGHTS_DIR/$(dirname "$FILE")"
     if [ ! -d "$DIR" ]; then

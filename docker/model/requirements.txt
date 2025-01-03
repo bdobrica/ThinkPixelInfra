@@ -1,8 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi[standard]
 uvicorn
 pyyaml
 pyzmq
 torch
-torchaudio
-torchvision
-transformers
+transformers[torch]

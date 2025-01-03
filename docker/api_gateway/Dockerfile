@@ -1,6 +1,9 @@
 # Stage 1: Build the Go application
 FROM golang:1.23 AS build
 
+ARG TARGETOS
+ARG TARGETARCH
+
 # Set the working directory inside the container
 WORKDIR /app
 
@@ -14,7 +17,7 @@ RUN go mod download
 COPY api_gateway/. ./
 
 # Build the Go application as a static binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api_gateway main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o api_gateway main.go
 
 # Stage 2: Create the runtime image
 FROM alpine:3.21
