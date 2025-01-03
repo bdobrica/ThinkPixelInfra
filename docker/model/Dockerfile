@@ -9,7 +9,7 @@ RUN /opt/weights.sh
 
 FROM python:3.10-slim-bookworm
 
-ENV VERSION="0.1.0"
+ENV VERSION="0.1.1"
 
 RUN apt-get update && rm -rf /var/lib/apt/lists/*
 RUN mkdir /app
