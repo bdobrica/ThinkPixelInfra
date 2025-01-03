@@ -22,8 +22,8 @@ jobs:
         run: |
           # Determine the commit range for git diff
           if [ -z "${{ github.event.before }}" ] || ! git cat-file -e "${{ github.event.before }}"; then
-            echo "No valid previous commit, using HEAD~1"
-            commit_range="HEAD~1"
+            echo "No valid previous commit, checking current commit only"
+            commit_range="HEAD"
           else
             echo "Using github.event.before"
             commit_range="${{ github.event.before }}..${{ github.sha }}"
@@ -35,7 +35,7 @@ jobs:
           cat changed_cfgs.txt
 
       - name: Skip Build if No Changes
-        if: failure()
+        if: success()
         run: |
           if [[ ! -s changed_cfgs.txt ]]; then
             echo "No changes in .bumpversion.cfg files. Skipping build."
