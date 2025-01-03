@@ -17,6 +17,9 @@ from .config import LOG_LEVEL, MODEL_HTTP_PORT, MODEL_ZMQ_CLIENT_ADDR
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
+# Track the status of model readiness
+ready = False
+
 
 class Metadata(BaseModel):
     id: int
@@ -43,6 +46,11 @@ class InferenceResponse(BaseModel):
     latency: float = 0.0
 
 
+class SuccessResponse(BaseModel):
+    status: str = "ok"
+    version: str = os.getenv("VERSION", "0.0.0")
+
+
 @lru_cache(maxsize=None)
 def create_zmq_context():
     global context
@@ -52,7 +60,43 @@ def create_zmq_context():
     logger.info("Created ZMQ context.")
 
 
+async def ping_zmq_request(timeout: float = 1.0):
+    """Helper function to send a ZMQ request and check if it's successful."""
+    global context
+
+    # Create ZMQ socket
+    socket: zmq.asyncio.Socket = context.socket(zmq.REQ)
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.setsockopt(zmq.RCVTIMEO, int(timeout * 1000))
+    socket.connect(MODEL_ZMQ_CLIENT_ADDR)
+
+    # Prepare request data
+    request_id = b"ping-request-" + os.urandom(4)  # Generate unique request ID
+    # Minimal request payload for pinging the model
+    request_data = {
+        "text_items": [TextItem(text="ping", metadata=Metadata(id=0)).dict()]
+    }
+
+    message = [request_id, b"", json.dumps(request_data).encode("utf-8")]
+
+    try:
+        await socket.send_multipart(message)
+        message = await socket.recv_multipart()
+        _, response = message[1:3]
+        response = json.loads(response.decode("utf-8"))
+
+        socket.close()
+
+        # Consider the request successful if "error" is not in the response
+        return "error" not in response
+    except Exception as e:
+        logger.error(f"ZMQ request failed: {e}")
+        socket.close()
+        return False
+
+
 async def infer(request: InferenceRequest) -> InferenceResponse:
+    """Inference endpoint to get embeddings for text items."""
     global context
 
     # Measure request time
@@ -89,9 +133,32 @@ async def infer(request: InferenceRequest) -> InferenceResponse:
     )
 
 
+async def ping() -> SuccessResponse:
+    """Ping endpoint to check system health."""
+    global ready
+
+    if ready:
+        # If already successful, return immediately without additional requests
+        return SuccessResponse(status="ok")
+
+    # Attempt to send ZMQ request until successful or timeout
+    timeout = 1.0  # seconds
+    start_time = time.perf_counter()
+
+    while time.perf_counter() - start_time < timeout:
+        success = await ping_zmq_request(timeout=timeout)
+        if success:
+            ready = True
+            return SuccessResponse(status="ok")
+
+    # If unsuccessful within the timeout, return an error
+    raise HTTPException(status_code=500, detail="Ping failed")
+
+
 def fastapi_server():
     app = FastAPI()
     _ = app.post("/infer")(infer)
+    _ = app.get("/ping")(ping)
 
     create_zmq_context()
 
