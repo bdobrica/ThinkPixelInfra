@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: API_GATEWAY_MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: api-gateway-mysql-host
+            - name: API_GATEWAY_MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: api-gateway-mysql-port
+            - name: API_GATEWAY_MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: api-gateway-mysql-user
+            - name: API_GATEWAY_MYSQL_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: api-gateway-mysql-db
+            - name: API_GATEWAY_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: user-password
+            - name: API_GATEWAY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-password
+            - name: API_GATEWAY_MODEL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: api-gateway-config
+                  key: api-gateway-model-url
+            - name: API_GATEWAY_DB_DSN
+              value: "${API_GATEWAY_MYSQL_USER}:${API_GATEWAY_MYSQL_PASSWORD}@tcp(${API_GATEWAY_MYSQL_HOST}:${API_GATEWAY_MYSQL_PORT})/${API_GATEWAY_MYSQL_DB}"
+          resources:
+            limits:
+              cpu: 200m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      imagePullSecrets:
+        - name: quay-io-credentials
+

@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-replica
+  labels:
+    prefix: redis-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: replica
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: replica
+    spec:
+      containers:
+        - name: redis-replica
+          image: redis/redis-stack:latest
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 500m
+            requests:
+              memory: 512Mi
+              cpu: 250m
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-password
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo
+          command:
+            - /bin/sh
+            - -c
+            - |
+              SUFFIX=${POD_NAME#redis-replica-}; SUFFIX=${SUFFIX%-*}; SUFFIX=${SUFFIX%-*}
+              redis-stack-server \
+              --appendonly yes \
+              --requirepass ${REDIS_PASSWORD} \
+              --replicaof redis-master-$SUFFIX 6379
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - redis
+              topologyKey: kubernetes.io/hostname
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations

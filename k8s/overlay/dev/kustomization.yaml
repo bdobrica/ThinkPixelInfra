@@ -1,0 +1,23 @@
+resources:
+  - ../../base/namespace
+  - ../../base/secrets
+  - ../../base/mysql
+  - ../../base/ml-model
+  - ../../base/api-gateway
+  - ./redis
+
+namespace: thinkpixel
+
+patches:
+  - path: patches/redis-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: redis-secret
+  - path: patches/mysql-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: mysql-secret
+  - path: patches/quay-io-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: quay-io-secret

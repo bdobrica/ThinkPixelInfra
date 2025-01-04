@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+data:
+  api-gateway-model-url: http://ml-model:8000/infer
+  api-gateway-mysql-host: mysql
+  api-gateway-mysql-port: "3306"
+  api-gateway-mysql-user: thinkpixel
+  api-gateway-mysql-db: thinkpixel

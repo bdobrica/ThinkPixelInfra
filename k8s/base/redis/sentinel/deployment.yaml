@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-sentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: sentinel
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: sentinel
+    spec:
+      volumes:
+        - name: sentinel-config
+          emptyDir: {}
+        - name: config-template
+          configMap:
+            name: redis-masters
+      initContainers:
+        - name: configure-sentinel
+          image: busybox:1.35
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Reading Redis master names from ConfigMap..."
+              while IFS= read -r master; do
+                if [ -n "$master" ]; then
+                  master_ip=$(nslookup $master 2>/dev/null | awk '/^Address: / { print $2 }' | tail -n1)
+                  if [ -z "$master_ip" ]; then
+                    echo "Failed to resolve $master" >&2
+                    exit 1
+                  fi
+                  echo "sentinel monitor $master $master_ip 6379 2" >> /etc/sentinel/sentinel.conf
+                  echo "sentinel auth-pass $master ${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
+                  echo "sentinel down-after-milliseconds $master 5000" >> /etc/sentinel/sentinel.conf
+                  echo "sentinel failover-timeout $master 10000" >> /etc/sentinel/sentinel.conf
+                  echo "sentinel parallel-syncs $master 1" >> /etc/sentinel/sentinel.conf
+                fi
+              done < /etc/config-template/masters
+              echo "requirepass ${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
+          volumeMounts:
+            - name: sentinel-config
+              mountPath: /etc/sentinel
+            - name: config-template
+              mountPath: /etc/config-template
+      containers:
+        - name: redis-sentinel
+          image: redis/redis-stack:latest
+          command:
+            - redis-sentinel
+            - /etc/sentinel/sentinel.conf
+          ports:
+            - containerPort: 26379
+          volumeMounts:
+            - name: sentinel-config
+              mountPath: /etc/sentinel

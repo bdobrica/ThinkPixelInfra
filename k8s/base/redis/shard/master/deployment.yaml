@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: master
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: master
+    spec:
+      containers:
+        - name: redis-master
+          image: redis/redis-stack:latest
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 500m
+            requests:
+              memory: 512Mi
+              cpu: 250m
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: redis-password
+          command:
+            - "redis-stack-server"
+            - "--appendonly"
+            - "yes"
+            - "--requirepass"
+            - "${REDIS_PASSWORD}"
+          ports:
+            - containerPort: 6379
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - redis
+              topologyKey: kubernetes.io/hostname

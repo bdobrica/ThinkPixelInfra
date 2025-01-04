@@ -1,0 +1,14 @@
+
+patches:
+  - path: redis-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: redis-secret
+  - path: mysql-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: mysql-secret
+  - path: quay-io-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: quay-io-secret
