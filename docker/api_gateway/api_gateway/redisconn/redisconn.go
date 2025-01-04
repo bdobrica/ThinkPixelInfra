@@ -29,11 +29,35 @@ var (
 	clientCacheLock 	sync.Mutex
 )
 
+// extract redis host, port and master name from redis server string
+func extractRedisServerInfo(redisServer string) (host string, port string, masterName string, err error) {
+	// Split the string into host:port and masterName
+	parts := strings.Split(redisServer, "/")
+	if len(parts) != 2 {
+		logger.Errorf("Invalid RedisServer format: %s\n", redisServer)
+		return "", "", "", fmt.Errorf("Invalid RedisServer format: %s", redisServer)
+	}
+
+	hostPort := parts[0]
+	masterName = parts[1]
+
+	// Split host:port into host and port
+	hostPortParts := strings.Split(hostPort, ":")
+	if len(hostPortParts) != 2 {
+		logger.Errorf("Invalid RedisServer format: %s\n", redisServer)
+		return "", "", "", fmt.Errorf("Invalid RedisServer format: %s", redisServer)
+	}
+
+	host = hostPortParts[0]
+	port = hostPortParts[1]
+
+	return host, port, masterName, nil
+}
+
 // initializeRedisClient initializes a new Redis client based on RedisServer string
 func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	// Parse RedisServer string
-	var host, port, masterName string
-	_, err := fmt.Sscanf(redisServer, "%s:%s/%s", &host, &port, &masterName)
+	host, port, masterName, err := extractRedisServerInfo(redisServer)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid RedisServer format: %s", redisServer)
 	}
