@@ -21,11 +21,12 @@ type redisClientCacheEntry struct {
 }
 
 var (
-	clientCache     sync.Map // Cache of Redis clients
-	defaultTTL      = time.Hour
-	ttlFromEnv, _   = strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
-	clientCacheTTL  = time.Duration(ttlFromEnv) * time.Second
-	clientCacheLock sync.Mutex
+	clientCache			sync.Map // Cache of Redis clients
+	sentinelPassword	= config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
+	defaultTTL      	= time.Hour
+	ttlFromEnv, _   	= strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
+	clientCacheTTL  	= time.Duration(ttlFromEnv) * time.Second
+	clientCacheLock 	sync.Mutex
 )
 
 // initializeRedisClient initializes a new Redis client based on RedisServer string
@@ -42,6 +43,7 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	// Create Redis Failover Client
 	client := redis.NewFailoverClient(&redis.FailoverOptions{
 		MasterName:    masterName,
+		Password:      sentinelPassword,
 		SentinelAddrs: []string{sentinelAddr},
 		DialTimeout:   5 * time.Second,
 		ReadTimeout:   5 * time.Second,
