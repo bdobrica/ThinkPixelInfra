@@ -26,7 +26,7 @@ jobs:
         id: changes
         run: |
           # Determine the commit range for git diff
-          if [ -z "${{ github.event.before }}" ] || ! git cat-file -e "${{ github.event.before }}"; then
+          if [ -z "${{ github.event.before }}" ] || ! git cat-file commit "${{ github.event.before }}" >/dev/null 2>&1; then
             echo "No valid previous commit, checking current commit only"
             commit_range="HEAD"
           else
