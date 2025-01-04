@@ -26,14 +26,9 @@ jobs:
         id: changes
         run: |
           # Determine the commit range for git diff
-          if [ -z "${{ github.event.before }}" ] || ! git cat-file commit "${{ github.event.before }}" >/dev/null 2>&1; then
-            echo "No valid previous commit, checking current commit only"
-            commit_range="HEAD"
-          else
-            echo "Using github.event.before"
-            commit_range="${{ github.event.before }}..${{ github.sha }}"
-          fi
-
+          echo "Using github.event.before"
+          commit_range="${{ github.event.before }}..${{ github.event.after }}"
+          
           echo "Comparing changes in range: $commit_range"
           git diff --name-only $commit_range > changed_files.txt
           grep -E '^docker/.*/\.bumpversion\.cfg$' changed_files.txt > changed_cfgs.txt || true
