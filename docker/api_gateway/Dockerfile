@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o api_gateway 
 FROM alpine:3.21
 
 # Set the version of the application
-ENV VERSION="0.1.3"
+ENV VERSION="0.1.4"
 
 # Install any runtime dependencies (e.g., certificates)
 RUN apk --no-cache add ca-certificates
