@@ -1,10 +1,10 @@
 package logger
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"sync"
-	"fmt"
 
 	"api_gateway/config"
 )
@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	LogLevel     int = Warning
+	LogLevel      int = Warning
 	logLevelMutex sync.Mutex
 )
 

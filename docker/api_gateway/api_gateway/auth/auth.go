@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"net/http"
 	"api_gateway/utils"
+	"net/http"
 )
 
 // AuthHandler exchanges API key for a JWT
@@ -34,4 +34,3 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 		"exp":   exp,
 	})
 }
-

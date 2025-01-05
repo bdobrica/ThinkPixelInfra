@@ -1,11 +1,11 @@
 package auth
 
 import (
-	"time"
 	"errors"
+	"time"
 
-	"github.com/golang-jwt/jwt/v4"
 	"api_gateway/config"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // Use a secure method for managing secrets
@@ -15,9 +15,9 @@ var jwtSecret = []byte(config.GetEnv("API_GATEWAY_JWT_SECRET", "supersecretkey")
 func GenerateJWT(apiKey string, hashedKey string) (string, int64, error) {
 	expirationTime := time.Now().Add(15 * time.Minute).Unix()
 	claims := jwt.MapClaims{
-		"sub"		: apiKey,			// Subject: API Key
-		"hashed_key": hashedKey,		// Include the API Key Hash
-		"exp"		: expirationTime,	// Expiration timestamp
+		"sub":        apiKey,         // Subject: API Key
+		"hashed_key": hashedKey,      // Include the API Key Hash
+		"exp":        expirationTime, // Expiration timestamp
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString(jwtSecret)
@@ -26,7 +26,6 @@ func GenerateJWT(apiKey string, hashedKey string) (string, int64, error) {
 	}
 	return signedToken, expirationTime, nil
 }
-
 
 // ValidateJWT verifies the provided JWT
 func ValidateJWT(tokenString string) (*jwt.Token, error) {

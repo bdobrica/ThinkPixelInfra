@@ -7,4 +7,10 @@
         "--max-line-length",
         "80"
     ],
+    "go.formatTool": "gofmt",
+    "[go]": {
+        "editor.insertSpaces": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "golang.go"
+    },
 }

@@ -3,11 +3,11 @@ package db
 import (
 	"database/sql"
 	"errors"
-	"time"
 	"sync"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"api_gateway/config"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (

@@ -1,16 +1,16 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
-	"encoding/json"
 
-	"api_gateway/redisconn"
-	"api_gateway/utils"
-	"api_gateway/model"
-	"api_gateway/middleware"
 	"api_gateway/auth"
 	"api_gateway/logger"
+	"api_gateway/middleware"
+	"api_gateway/model"
+	"api_gateway/redisconn"
+	"api_gateway/utils"
 )
 
 // SearchHandler handles embedding creation and ANN search

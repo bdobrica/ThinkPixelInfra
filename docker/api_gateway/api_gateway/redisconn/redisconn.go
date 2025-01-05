@@ -5,29 +5,29 @@ import (
 	"encoding/base64"
 	"fmt"
 	"sort"
-	"sync"
-	"time"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/go-redis/redis/v8"
-	"api_gateway/model"
 	"api_gateway/config"
 	"api_gateway/logger"
+	"api_gateway/model"
+	"github.com/go-redis/redis/v8"
 )
 
 type redisClientCacheEntry struct {
-	client     *redis.Client
-	expiresAt  time.Time
+	client    *redis.Client
+	expiresAt time.Time
 }
 
 var (
-	clientCache			sync.Map // Cache of Redis clients
-	sentinelPassword	= config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
-	defaultTTL      	= time.Hour
-	ttlFromEnv, _   	= strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
-	clientCacheTTL  	= time.Duration(ttlFromEnv) * time.Second
-	clientCacheLock 	sync.Mutex
+	clientCache      sync.Map // Cache of Redis clients
+	sentinelPassword = config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
+	defaultTTL       = time.Hour
+	ttlFromEnv, _    = strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
+	clientCacheTTL   = time.Duration(ttlFromEnv) * time.Second
+	clientCacheLock  sync.Mutex
 )
 
 // extract redis host, port and master name from redis server string
@@ -67,13 +67,13 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 
 	// Create Redis Failover Client
 	client := redis.NewFailoverClient(&redis.FailoverOptions{
-		MasterName:		masterName,
-		Password:      	sentinelPassword,
+		MasterName:       masterName,
+		Password:         sentinelPassword,
 		SentinelPassword: sentinelPassword,
-		SentinelAddrs: []string{sentinelAddr},
-		DialTimeout:   5 * time.Second,
-		ReadTimeout:   5 * time.Second,
-		WriteTimeout:  5 * time.Second,
+		SentinelAddrs:    []string{sentinelAddr},
+		DialTimeout:      5 * time.Second,
+		ReadTimeout:      5 * time.Second,
+		WriteTimeout:     5 * time.Second,
 	})
 
 	// Test connection
@@ -133,7 +133,7 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 	prefix := fmt.Sprintf("%d:", siteID)
 	indexName := fmt.Sprintf("index:%d", siteID)
 	logger.Debugf("Storing %d embeddings with prefix %s in index %s", len(embeddings), prefix, indexName)
-	
+
 	client, err := getRedisClient(redisServer)
 	if err != nil {
 		return storedCount, fmt.Errorf("Failed to get Redis client: %w", err)
@@ -143,13 +143,13 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 	if _, err := client.Do(ctx, "FT.INFO", indexName).Result(); err != nil {
 		logger.Debugf("FT index %s does not exist, creating...", indexName)
 		if _, err := client.Do(ctx, "FT.CREATE", indexName,
-			"ON", "HASH",           // Indicate indexing on Redis hashes
-			"PREFIX", "1", prefix,  // Use prefix for document keys
-			"SCHEMA",               // Define schema for the index
-			"embedding", "VECTOR",  // Define the vector field
-			"FLAT", "6",            // Use FLAT index for vector search
-			"TYPE", "FLOAT32",      // Type of vector elements
-			"DIM", "768",           // Dimension of the vector
+			"ON", "HASH", // Indicate indexing on Redis hashes
+			"PREFIX", "1", prefix, // Use prefix for document keys
+			"SCHEMA",              // Define schema for the index
+			"embedding", "VECTOR", // Define the vector field
+			"FLAT", "6", // Use FLAT index for vector search
+			"TYPE", "FLOAT32", // Type of vector elements
+			"DIM", "768", // Dimension of the vector
 			"DISTANCE_METRIC", "COSINE", // Cosine distance for similarity
 		).Result(); err != nil {
 			logger.Errorf("Error creating FT index: %v", err)
@@ -193,7 +193,7 @@ func SearchEmbeddings(siteId int, redisServer string, embeddings []model.Embeddi
 	results := []map[string]interface{}{}
 	indexName := fmt.Sprintf("index:%d", siteId)
 	logger.Debugf("Searching embeddings in index %s", indexName)
-	
+
 	client, err := getRedisClient(redisServer)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get Redis client: %w", err)
@@ -213,19 +213,19 @@ func SearchEmbeddings(siteId int, redisServer string, embeddings []model.Embeddi
 			"PARAMS", "2", "query_vec", embeddingBytes,
 			"SORTBY", "score",
 			"DIALECT", "2")
-				
+
 		searchResults, err := cmd.Result()
 		if err != nil {
 			logger.Errorf("Error executing search query: %v", err)
 			return nil, fmt.Errorf("Failed to execute search query: %w", err)
 		}
-		
+
 		resultsArray, ok := searchResults.([]interface{})
 		if !ok {
 			logger.Errorf("Unexpected search result format: %v", searchResults)
 			return nil, fmt.Errorf("Unexpected search result format")
 		}
-			
+
 		// Process results
 		for i := 1; i < len(resultsArray); i++ {
 			logger.Debugf("Processing search result %d", i)
@@ -279,7 +279,6 @@ func SearchEmbeddings(siteId int, redisServer string, embeddings []model.Embeddi
 				"score": score,
 			})
 		}
-
 
 	}
 

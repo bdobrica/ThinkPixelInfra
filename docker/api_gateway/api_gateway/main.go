@@ -3,12 +3,12 @@ package main
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"api_gateway/auth"
 	"api_gateway/handlers"
 	"api_gateway/logger"
 	"api_gateway/middleware"
 	"api_gateway/ping"
+	"github.com/gorilla/mux"
 )
 
 func main() {

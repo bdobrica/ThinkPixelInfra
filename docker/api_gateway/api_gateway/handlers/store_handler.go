@@ -1,16 +1,16 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
-	"encoding/json"
 
-	"api_gateway/redisconn"
-	"api_gateway/utils"
-	"api_gateway/model"
-	"api_gateway/middleware"
 	"api_gateway/auth"
 	"api_gateway/logger"
+	"api_gateway/middleware"
+	"api_gateway/model"
+	"api_gateway/redisconn"
+	"api_gateway/utils"
 )
 
 // StoreHandler handles storing webpage data
@@ -73,9 +73,9 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Send summary back as JSON
 		utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
-			"received_texts":    len(input),
+			"received_texts":   len(input),
 			"stored_documents": storedCount,
-			"timestamp":         time.Now().Format(time.RFC3339),
+			"timestamp":        time.Now().Format(time.RFC3339),
 		})
 	case err := <-errChan:
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving embeddings: "+err.Error())
