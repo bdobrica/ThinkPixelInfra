@@ -31,11 +31,12 @@ spec:
                   name: redis-secret
                   key: redis-password
           command:
-            - "redis-stack-server"
-            - "--appendonly"
-            - "yes"
-            - "--requirepass"
-            - "${REDIS_PASSWORD}"
+            - /bin/sh
+            - -c
+            - |
+              redis-stack-server \
+              --appendonly yes \
+              --requirepass ${REDIS_PASSWORD}
           ports:
             - containerPort: 6379
       affinity:

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 	"strconv"
+	"strings"
 
 	"github.com/go-redis/redis/v8"
 	"api_gateway/model"
@@ -66,8 +67,9 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 
 	// Create Redis Failover Client
 	client := redis.NewFailoverClient(&redis.FailoverOptions{
-		MasterName:    masterName,
-		Password:      sentinelPassword,
+		MasterName:		masterName,
+		Password:      	sentinelPassword,
+		SentinelPassword: sentinelPassword,
 		SentinelAddrs: []string{sentinelAddr},
 		DialTimeout:   5 * time.Second,
 		ReadTimeout:   5 * time.Second,
@@ -78,7 +80,7 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err := client.Ping(ctx).Result(); err != nil {
-		return nil, fmt.Errorf("Failed to connect to Redis Sentinel at %s: %w", sentinelAddr, err)
+		return nil, fmt.Errorf("Failed to connect to Redis Sentinel at %s / %s: %w", sentinelAddr, masterName, err)
 	}
 
 	return client, nil

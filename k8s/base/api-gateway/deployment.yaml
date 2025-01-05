@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.1.3
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.1.6-dev
           ports:
             - containerPort: 8080
           env:
@@ -54,7 +54,7 @@ spec:
                   name: api-gateway-config
                   key: api-gateway-model-url
             - name: API_GATEWAY_DB_DSN
-              value: "${API_GATEWAY_MYSQL_USER}:${API_GATEWAY_MYSQL_PASSWORD}@tcp(${API_GATEWAY_MYSQL_HOST}:${API_GATEWAY_MYSQL_PORT})/${API_GATEWAY_MYSQL_DB}"
+              value: "$(API_GATEWAY_MYSQL_USER):$(API_GATEWAY_MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
           resources:
             limits:
               cpu: 200m
