@@ -20,8 +20,8 @@ type ValidationResponse struct {
 }
 
 func verifyDomain(domain string, path string, salt string, token string) {
-	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "")
-	timeoutStr := config.GetEnv("API_GATEWAY_VALIDATION_TIMEOUT", "1s")
+	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "wp-content/plugins/thinkpixel/rpc/validate/")
+	timeoutStr := config.GetEnv("API_GATEWAY_VALIDATION_TIMEOUT", "5s")
 	timeout, err := time.ParseDuration(timeoutStr)
 	if err != nil {
 		logger.Fatalf("Failed to parse validation timeout: %v", err)
