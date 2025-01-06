@@ -14,9 +14,10 @@ import (
 )
 
 type SearchRequest struct {
-    Text string `json:"text"`
-    ID   int    `json:"id"`
+	Text string `json:"text"`
+	ID   int    `json:"id"`
 }
+
 // SearchHandler handles embedding creation and ANN search
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve CacheEntry from context
@@ -28,7 +29,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debugf("CacheEntry %+v", cacheEntry)
 
 	// Parse input
-	var input SearchRequest 
+	var input SearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return

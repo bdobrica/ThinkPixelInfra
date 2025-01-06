@@ -3,13 +3,14 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
-    "fmt"
 
 	"api_gateway/config"
-    "api_gateway/logger"
+	"api_gateway/logger"
+	"api_gateway/utils"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -101,69 +102,69 @@ func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, int, error) {
 }
 
 // StoreRegistrationData stores registration data in the database
-func StoreRegistrationData(domain string, path string, requestSalt string, verificationToken string, estimatedPages int, averagePageSize int, stDevPageSize int) error {
+func StoreRegistrationData(domain string, path string, requestSalt string, validationToken string, estimatedPages int, averagePageSize int, stDevPageSize int) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
 	}
 
-    logger.Infof("Storing registration data for domain %s and path %s: requestSalt=%s, token=%s, estimatedPages=%d, averagePageSize=%d, stDevPageSize=%d", domain, path, requestSalt, verificationToken, estimatedPages, averagePageSize, stDevPageSize)
+	logger.Infof("Storing registration data for domain %s and path %s: requestSalt=%s, token=%s, estimatedPages=%d, averagePageSize=%d, stDevPageSize=%d", domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
 
 	query := `
-		INSERT INTO wp_api_keys (domain, path, request_salt, verification_token, verification_method, verification_status, estimated_pages, average_page_size, st_dev_page_size, status)
+		INSERT INTO wp_api_keys (domain, path, request_salt, validation_token, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
 		VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')`
 
-	_, err = dbConn.Exec(query, domain, path, requestSalt, verificationToken, estimatedPages, averagePageSize, stDevPageSize)
+	_, err = dbConn.Exec(query, domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
 	if err != nil {
-        logger.Errorf("Failed to store registration data: %v", err)
+		logger.Errorf("Failed to store registration data: %v", err)
 		return errors.New("Failed to store registration data: " + err.Error())
 	}
 
 	return nil
 }
 
-// GetVerificationTokenDetails retrieves verification token details for pending status
-func getVerificationTokenDetails(domain, path, verificationStatus string) (string, string, error) {
+// GetValidationTokenDetails retrieves validation token details for pending status
+func getValidationTokenDetails(domain, path, validationStatus string) (string, string, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return "", "", err
 	}
 
 	query := `
-		SELECT verification_token, request_salt
+		SELECT validation_token, request_salt
 		FROM wp_api_keys
-		WHERE domain = ? AND path = ? AND verification_status = ?`
+		WHERE domain = ? AND path = ? AND validation_status = ?`
 
-	row := dbConn.QueryRow(query, domain, path, verificationStatus)
+	row := dbConn.QueryRow(query, domain, path, validationStatus)
 
 	var (
-        verificationToken string
-        requestSalt string
-    )
-	if err := row.Scan(&verificationToken, &requestSalt); err != nil {
+		validationToken string
+		requestSalt     string
+	)
+	if err := row.Scan(&validationToken, &requestSalt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", "", fmt.Errorf("No %s verification token found", verificationStatus)
+			return "", "", fmt.Errorf("No %s validation token found", validationStatus)
 		}
 		return "", "", errors.New("Database query error")
 	}
 
-	return verificationToken, requestSalt, nil
+	return validationToken, requestSalt, nil
 }
 
 func GetPendingTokenDetails(domain, path string) (string, string, error) {
-    return getVerificationTokenDetails(domain, path, "pending")
+	return getValidationTokenDetails(domain, path, "pending")
 }
 
 func GetFailedTokenDetails(domain, path string) (string, string, error) {
-    return getVerificationTokenDetails(domain, path, "failed")
+	return getValidationTokenDetails(domain, path, "failed")
 }
 
 func GetVerifiedTokenDetails(domain, path string) (string, string, error) {
-    return getVerificationTokenDetails(domain, path, "verified")
+	return getValidationTokenDetails(domain, path, "verified")
 }
 
-// ActivateAPIKey updates the API key and status to active for a given verification token
-func ActivateAPIKey(verificationToken string, apiKey string) error {
+// ActivateAPIKey updates the API key and status to active for a given validation token
+func ActivateAPIKey(validationToken string, apiKey string) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -179,9 +180,9 @@ func ActivateAPIKey(verificationToken string, apiKey string) error {
 	query := `
 		UPDATE wp_api_keys
 		SET api_key = ?, status = 'active', updated_at = NOW(), verified_at = NOW(), expires_at = ?
-		WHERE verification_token = ? AND verification_status = 'verified'`
+		WHERE validation_token = ? AND validation_status = 'verified'`
 
-	result, err := dbConn.Exec(query, apiKey, expiresAt, verificationToken)
+	result, err := dbConn.Exec(query, apiKey, expiresAt, validationToken)
 	if err != nil {
 		return errors.New("Failed to activate API key: " + err.Error())
 	}
@@ -194,11 +195,41 @@ func ActivateAPIKey(verificationToken string, apiKey string) error {
 		return errors.New("No matching record found to activate")
 	}
 
+	// Retrieve the ID of the API key row you just activated, since it's the foreign key in wp_client_requests.
+	// This can be done in multiple ways; for instance, if you store the auto-increment in a local variable
+	// or re-query the row after updating. For example:
+	var (
+		apiKeyID, estimatedPages, averagePageSize, stDevPageSize int
+	)
+	lookupQuery := `
+        SELECT id, estimated_pages, average_page_size, st_dev_page_size
+        FROM wp_api_keys
+        WHERE api_key = ?
+        LIMIT 1
+    `
+	err = dbConn.QueryRow(lookupQuery, apiKey).Scan(&apiKeyID, &estimatedPages, &averagePageSize, &stDevPageSize)
+	if err != nil {
+		// Not strictly fatal here, but you may choose to handle differently
+		logger.Errorf("Failed to retrieve api_key_id: %v", err)
+		return err
+	}
+
+	// Estimate the memory needed for the API key and assign it to a Redis master
+	var requestedBytes uint64 = utils.EstimateMemory(estimatedPages, averagePageSize, stDevPageSize)
+
+	// Call the concurrency-safe function to assign a Redis master, if possible.
+	// Do not fail activation if it fails to find capacity. That is handled in the function’s logic.
+	if err := AssignToRedisMaster(apiKeyID, requestedBytes); err != nil {
+		// You might want to log this error but not necessarily fail activation
+		logger.Errorf("Failed to assign Redis node: %v", err)
+		// Decide if you want to return an error or continue
+	}
+
 	return nil
 }
 
-// VerifyToken marks a verification token as verified
-func VerifyToken(verificationToken, domain, path string) error {
+// VerifyToken marks a validation token as verified
+func VerifyToken(validationToken, domain, path string) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -206,10 +237,10 @@ func VerifyToken(verificationToken, domain, path string) error {
 
 	query := `
 		UPDATE wp_api_keys
-		SET verification_status = 'verified', verified_at = NOW(), updated_at = NOW()
-		WHERE verification_token = ? AND domain = ? AND path = ? AND verification_status IN ('pending', 'failed')`
+		SET validation_status = 'verified', verified_at = NOW(), updated_at = NOW()
+		WHERE validation_token = ? AND domain = ? AND path = ? AND validation_status IN ('pending', 'failed')`
 
-	result, err := dbConn.Exec(query, verificationToken, domain, path)
+	result, err := dbConn.Exec(query, validationToken, domain, path)
 	if err != nil {
 		return errors.New("Failed to verify token: " + err.Error())
 	}
@@ -225,8 +256,8 @@ func VerifyToken(verificationToken, domain, path string) error {
 	return nil
 }
 
-// FailToken marks a verification token as failed
-func FailToken(verificationToken, domain, path string) error {
+// FailToken marks a validation token as failed
+func FailToken(validationToken, domain, path string) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -234,10 +265,10 @@ func FailToken(verificationToken, domain, path string) error {
 
 	query := `
 		UPDATE wp_api_keys
-		SET verification_status = 'failed', verified_at = NOW(), updated_at = NOW()
-		WHERE verification_token = ? AND domain = ? AND path = ? AND verification_status IN ('pending', 'failed')`
+		SET validation_status = 'failed', verified_at = NOW(), updated_at = NOW()
+		WHERE validation_token = ? AND domain = ? AND path = ? AND validation_status IN ('pending', 'failed')`
 
-	result, err := dbConn.Exec(query, verificationToken, domain, path)
+	result, err := dbConn.Exec(query, validationToken, domain, path)
 	if err != nil {
 		return errors.New("Failed to mark token as failed: " + err.Error())
 	}
@@ -253,30 +284,30 @@ func FailToken(verificationToken, domain, path string) error {
 	return nil
 }
 
-// ResetVerificationStatus resets the verification status for a given domain and path
-func ResetVerificationStatus(domain, path, requestSalt string) error {
-    dbConn, err := GetDBConnection()
-    if err != nil {
-        return err
-    }
+// ResetValidationStatus resets the validation status for a given domain and path
+func ResetValidationStatus(domain, path, requestSalt string) error {
+	dbConn, err := GetDBConnection()
+	if err != nil {
+		return err
+	}
 
-    query := `
+	query := `
         UPDATE wp_api_keys
-        SET verification_status = 'pending', request_salt = ?, updated_at = NOW()
-        WHERE domain = ? AND path = ? AND verification_status = 'failed'`
+        SET validation_status = 'pending', request_salt = ?, updated_at = NOW()
+        WHERE domain = ? AND path = ? AND validation_status = 'failed'`
 
-    result, err := dbConn.Exec(query, requestSalt, domain, path)
-    if err != nil {
-        return errors.New("Failed to reset verification status: " + err.Error())
-    }
+	result, err := dbConn.Exec(query, requestSalt, domain, path)
+	if err != nil {
+		return errors.New("Failed to reset validation status: " + err.Error())
+	}
 
-    affected, err := result.RowsAffected()
-    if err != nil {
-        return errors.New("Failed to retrieve affected rows: " + err.Error())
-    }
-    if affected == 0 {
-        return errors.New("No matching record found to reset")
-    }
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return errors.New("Failed to retrieve affected rows: " + err.Error())
+	}
+	if affected == 0 {
+		return errors.New("No matching record found to reset")
+	}
 
-    return nil
+	return nil
 }

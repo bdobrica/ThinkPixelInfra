@@ -7,7 +7,7 @@ import (
 
 	"api_gateway/db"
 	"api_gateway/logger"
-    "api_gateway/utils"
+	"api_gateway/utils"
 )
 
 type RegisterRequest struct {
@@ -20,9 +20,9 @@ type RegisterRequest struct {
 }
 
 type RegisterResponse struct {
-	VerificationToken string `json:"verification_token"`
-	SaltedToken       string `json:"salted_token"`
-	Message           string `json:"message"`
+	ValidationToken string `json:"validation_token"`
+	SaltedToken     string `json:"salted_token"`
+	Message         string `json:"message"`
 }
 
 // Store the registration data in the database
@@ -39,48 +39,48 @@ func storeRegistrationData(req RegisterRequest, token string) error {
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
 	// Check if a record already exists with the same parameters
 	existingToken, _, err := db.GetFailedTokenDetails(req.Domain, req.Path)
 	if err == nil {
-		// If the verification has failed, reset it to pending
-		if err := db.ResetVerificationStatus(req.Domain, req.Path, req.Salt); err != nil {
-            utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		// If the validation has failed, reset it to pending
+		if err := db.ResetValidationStatus(req.Domain, req.Path, req.Salt); err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		resp := RegisterResponse{
-			VerificationToken: existingToken,
-            SaltedToken:       saltMessage(existingToken, req.Salt),
-			Message:           "Verification has been reset to pending. Please respond to the challenge.",
+			ValidationToken: existingToken,
+			SaltedToken:     saltMessage(existingToken, req.Salt),
+			Message:         "Validation has been reset to pending. Please respond to the challenge.",
 		}
 		utils.RespondWithJSON(w, http.StatusOK, resp)
 
-        // Perform asynchronous verification
-        go verifyDomain(req.Domain, req.Path, req.Salt, existingToken)
+		// Perform asynchronous validation
+		go verifyDomain(req.Domain, req.Path, req.Salt, existingToken)
 		return
 	}
 
-	// Generate a verification token
-	verificationToken := generateVerificationToken()
+	// Generate a validation token
+	validationToken := generateValidationToken()
 
 	// Store the data and token in the database
-	err = storeRegistrationData(req, verificationToken)
+	err = storeRegistrationData(req, validationToken)
 	if err != nil {
-        utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Respond to the client with the verification token
+	// Respond to the client with the validation token
 	resp := RegisterResponse{
-		VerificationToken: verificationToken,
-		SaltedToken:       saltMessage(verificationToken, req.Salt),
-		Message:           "Verification initiated. Please respond to the challenge.",
+		ValidationToken: validationToken,
+		SaltedToken:     saltMessage(validationToken, req.Salt),
+		Message:         "Validation initiated. Please respond to the challenge.",
 	}
-    utils.RespondWithJSON(w, http.StatusOK, resp)
+	utils.RespondWithJSON(w, http.StatusOK, resp)
 
-	// Perform asynchronous verification
-	go verifyDomain(req.Domain, req.Path, req.Salt, verificationToken)
+	// Perform asynchronous validation
+	go verifyDomain(req.Domain, req.Path, req.Salt, validationToken)
 }

@@ -14,9 +14,9 @@ import (
 )
 
 type StoreRequest []struct {
-    ID    int               `json:"id"`
-    Text  string            `json:"text"`
-    Extra map[string]string `json:"extra,omitempty"`
+	ID    int               `json:"id"`
+	Text  string            `json:"text"`
+	Extra map[string]string `json:"extra,omitempty"`
 }
 
 // StoreHandler handles storing webpage data

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// GenerateVerificationToken generates an alphanumeric verification token with a prefix
-func generateVerificationToken() string {
+// GenerateValidationToken generates an alphanumeric verification token with a prefix
+func generateValidationToken() string {
 	prefix := "verify-"
 	timestamp := time.Now().UnixNano()
 	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", timestamp)))
