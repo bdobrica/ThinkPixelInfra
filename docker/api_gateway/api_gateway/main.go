@@ -8,6 +8,7 @@ import (
 	"api_gateway/logger"
 	"api_gateway/middleware"
 	"api_gateway/ping"
+	"api_gateway/register"
 	"github.com/gorilla/mux"
 )
 
@@ -24,6 +25,10 @@ func main() {
 	// Protected Routes
 	r.Handle("/store", middleware.JWTMiddleware(http.HandlerFunc(handlers.StoreHandler))).Methods("POST")
 	r.Handle("/search", middleware.JWTMiddleware(http.HandlerFunc(handlers.SearchHandler))).Methods("POST")
+
+	// Register Routes
+	r.HandleFunc("/register", register.RegisterHandler).Methods("POST")
+	r.HandleFunc("/register/exchange", register.ExchangeTokenHandler).Methods("POST")
 
 	// Start Server
 	logger.Infof("API Gateway is running on port 8080")

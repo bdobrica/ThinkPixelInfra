@@ -13,6 +13,12 @@ import (
 	"api_gateway/utils"
 )
 
+type StoreRequest []struct {
+    ID    int               `json:"id"`
+    Text  string            `json:"text"`
+    Extra map[string]string `json:"extra,omitempty"`
+}
+
 // StoreHandler handles storing webpage data
 func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve CacheEntry from context
@@ -24,11 +30,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debugf("CacheEntry %+v", cacheEntry)
 
 	// Parse input
-	var input []struct {
-		ID    int               `json:"id"`
-		Text  string            `json:"text"`
-		Extra map[string]string `json:"extra,omitempty"`
-	}
+	var input StoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
