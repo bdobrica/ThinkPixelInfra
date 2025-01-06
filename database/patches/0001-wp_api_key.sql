@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `wp_redis_masters` (
 
 CREATE TABLE IF NOT EXISTS `wp_client_requests` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `api_key_id` VARCHAR(255) NOT NULL,        -- identifies the client or workload
+    `api_key_id` INT NOT NULL,        -- identifies the client or workload
     `requested_memory_bytes` BIGINT UNSIGNED NOT NULL, 
     `status` ENUM('pending', 'assigned', 'rejected', 'canceled') NOT NULL DEFAULT 'pending',  -- e.g. PENDING, ASSIGNED, REJECTED, CANCELLED, etc.
     `assigned_node_id` INT DEFAULT NULL,      -- foreign key to redis_nodes.id if assigned
