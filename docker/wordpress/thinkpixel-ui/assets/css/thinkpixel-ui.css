@@ -1,0 +1,43 @@
+/*
+Name: thinkpixel-ui
+Dependencies: flat-ui
+Version: 0.1
+*/
+.thinkpixel-rounded {
+    border-radius: 6px;
+}
+
+.thinkpixel-translucent {
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.thinkpixel-padded {
+    padding: 5px;
+}
+
+.select-block {
+    width: 100%;
+}
+
+.thinkpixel-padded .row {
+    margin-bottom: .5em;
+}
+
+.thinkpixel-conversation {
+    min-height: 1000px;
+}
+
+.thinkpixel-external {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.thinkpixel-center {
+    text-align: center;
+    margin: 0 8px;
+}
+
+.thinkpixel-justify {
+    text-align: justify;
+    margin: 0 8px;
+}
