@@ -53,52 +53,52 @@ func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
 	}
 
 	query := `
-		SELECT id, redis_server, expires_at, max_search_results
-		FROM wp_api_keys
+		SELECT id, indexing_node, expires_at, max_search_results
+		FROM wp_thinkpixel_sites
 		WHERE api_key = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
 	row := dbConn.QueryRow(query, hashedKey)
 
 	var id int
-	var redisServer string
+	var indexingNode string
 	var expiresAt sql.NullTime
 	var maxSearchResults int
-	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
+	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
 		}
 		return 0, "", time.Time{}, 0, errors.New("Database query error")
 	}
 
-	return id, redisServer, expiresAt.Time, maxSearchResults, nil
+	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
 }
 
 // GetAPIKeyDetailsByID retrieves API key details from the database by API Key ID
-func GetAPIKeyDetailsByID(apiKeyID int) (int, string, time.Time, int, error) {
+func GetAPIKeyDetailsByID(siteId int) (int, string, time.Time, int, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return 0, "", time.Time{}, 0, err
 	}
 
 	query := `
-		SELECT id, redis_server, expires_at
-		FROM wp_api_keys
+		SELECT id, indexing_node, expires_at
+		FROM wp_thinkpixel_sites
 		WHERE id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
-	row := dbConn.QueryRow(query, apiKeyID)
+	row := dbConn.QueryRow(query, siteId)
 
 	var id int
-	var redisServer string
+	var indexingNode string
 	var expiresAt sql.NullTime
 	var maxSearchResults int
-	if err := row.Scan(&id, &redisServer, &expiresAt, &maxSearchResults); err != nil {
+	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
 		}
 		return 0, "", time.Time{}, 0, errors.New("Database query error")
 	}
 
-	return id, redisServer, expiresAt.Time, maxSearchResults, nil
+	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
 }
 
 // StoreRegistrationData stores registration data in the database
@@ -111,7 +111,7 @@ func StoreRegistrationData(domain string, path string, requestSalt string, valid
 	logger.Infof("Storing registration data for domain %s and path %s: requestSalt=%s, token=%s, estimatedPages=%d, averagePageSize=%d, stDevPageSize=%d", domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
 
 	query := `
-		INSERT INTO wp_api_keys (domain, path, request_salt, validation_token, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
+		INSERT INTO wp_thinkpixel_sites (domain, path, request_salt, validation_token, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
 		VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')`
 
 	_, err = dbConn.Exec(query, domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
@@ -132,7 +132,7 @@ func getValidationTokenDetails(domain, path, validationStatus string) (string, s
 
 	query := `
 		SELECT validation_token, request_salt
-		FROM wp_api_keys
+		FROM wp_thinkpixel_sites
 		WHERE domain = ? AND path = ? AND validation_status = ?`
 
 	row := dbConn.QueryRow(query, domain, path, validationStatus)
@@ -178,7 +178,7 @@ func ActivateAPIKey(validationToken string, apiKey string) error {
 
 	expiresAt := time.Now().AddDate(0, 0, validityDays)
 	query := `
-		UPDATE wp_api_keys
+		UPDATE wp_thinkpixel_sites
 		SET api_key = ?, status = 'active', updated_at = NOW(), verified_at = NOW(), expires_at = ?
 		WHERE validation_token = ? AND validation_status = 'verified'`
 
@@ -195,22 +195,22 @@ func ActivateAPIKey(validationToken string, apiKey string) error {
 		return errors.New("No matching record found to activate")
 	}
 
-	// Retrieve the ID of the API key row you just activated, since it's the foreign key in wp_client_requests.
+	// Retrieve the ID of the API key row you just activated, since it's the foreign key in wp_thinkpixel_index_requests.
 	// This can be done in multiple ways; for instance, if you store the auto-increment in a local variable
 	// or re-query the row after updating. For example:
 	var (
-		apiKeyID, estimatedPages, averagePageSize, stDevPageSize int
+		siteId, estimatedPages, averagePageSize, stDevPageSize int
 	)
 	lookupQuery := `
         SELECT id, estimated_pages, average_page_size, st_dev_page_size
-        FROM wp_api_keys
+        FROM wp_thinkpixel_sites
         WHERE api_key = ?
         LIMIT 1
     `
-	err = dbConn.QueryRow(lookupQuery, apiKey).Scan(&apiKeyID, &estimatedPages, &averagePageSize, &stDevPageSize)
+	err = dbConn.QueryRow(lookupQuery, apiKey).Scan(&siteId, &estimatedPages, &averagePageSize, &stDevPageSize)
 	if err != nil {
 		// Not strictly fatal here, but you may choose to handle differently
-		logger.Errorf("Failed to retrieve api_key_id: %v", err)
+		logger.Errorf("Failed to retrieve site_id: %v", err)
 		return err
 	}
 
@@ -219,7 +219,7 @@ func ActivateAPIKey(validationToken string, apiKey string) error {
 
 	// Call the concurrency-safe function to assign a Redis master, if possible.
 	// Do not fail activation if it fails to find capacity. That is handled in the function’s logic.
-	if err := AssignToRedisMaster(apiKeyID, requestedBytes); err != nil {
+	if err := AssignToIndexingNode(siteId, requestedBytes); err != nil {
 		// You might want to log this error but not necessarily fail activation
 		logger.Errorf("Failed to assign Redis node: %v", err)
 		// Decide if you want to return an error or continue
@@ -236,7 +236,7 @@ func VerifyToken(validationToken, domain, path string) error {
 	}
 
 	query := `
-		UPDATE wp_api_keys
+		UPDATE wp_thinkpixel_sites
 		SET validation_status = 'verified', verified_at = NOW(), updated_at = NOW()
 		WHERE validation_token = ? AND domain = ? AND path = ? AND validation_status IN ('pending', 'failed')`
 
@@ -264,7 +264,7 @@ func FailToken(validationToken, domain, path string) error {
 	}
 
 	query := `
-		UPDATE wp_api_keys
+		UPDATE wp_thinkpixel_sites
 		SET validation_status = 'failed', verified_at = NOW(), updated_at = NOW()
 		WHERE validation_token = ? AND domain = ? AND path = ? AND validation_status IN ('pending', 'failed')`
 
@@ -292,7 +292,7 @@ func ResetValidationStatus(domain, path, requestSalt string) error {
 	}
 
 	query := `
-        UPDATE wp_api_keys
+        UPDATE wp_thinkpixel_sites
         SET validation_status = 'pending', request_salt = ?, updated_at = NOW()
         WHERE domain = ? AND path = ? AND validation_status = 'failed'`
 

@@ -12,7 +12,7 @@ ALTER TABLE `wp_api_keys`
     ADD COLUMN `request_salt` VARCHAR(64) DEFAULT NULL AFTER `rate_limit`, -- Salt for the request signature
     ADD COLUMN `st_dev_page_size` INT NOT NULL DEFAULT 0 AFTER `average_page_size`; -- Standard deviation for page size
 
-CREATE TABLE IF NOT EXISTS `wp_redis_masters` (
+CREATE TABLE IF NOT EXISTS `wp_thinkpixel_index_nodes` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `master_name` VARCHAR(255) NOT NULL UNIQUE,       -- e.g. "redis-master-01"
     `sentinel_name` VARCHAR(255) NOT NULL,          -- e.g. "redis-sentinel-01"
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `wp_redis_masters` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS `wp_client_requests` (
+CREATE TABLE IF NOT EXISTS `wp_thinkpixel_index_requests` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `api_key_id` INT NOT NULL,        -- identifies the client or workload
     `requested_memory_bytes` BIGINT UNSIGNED NOT NULL, 
@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS `wp_client_requests` (
     INDEX(status),
     INDEX(`assigned_node_id`),
     CONSTRAINT `fk_assigned_node`
-        FOREIGN KEY (`assigned_node_id`) REFERENCES `wp_redis_masters`(`id`)
+        FOREIGN KEY (`assigned_node_id`) REFERENCES `wp_thinkpixel_redis_nodes`(`id`)
         ON DELETE SET NULL,
     CONSTRAINT `fk_api_key_id`
-        FOREIGN KEY (`api_key_id`) REFERENCES `wp_api_keys`(`id`)
+        FOREIGN KEY (`api_key_id`) REFERENCES `wp_thinkpixel_sites`(`id`)
         ON DELETE CASCADE
 );

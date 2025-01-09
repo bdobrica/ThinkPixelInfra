@@ -63,7 +63,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	select {
 	case embeddings := <-embeddingChan:
 		// Perform ANN search on Redis for all embeddings
-		results, err := redisconn.SearchEmbeddings(cacheEntry.ID, cacheEntry.RedisServer, embeddings, cacheEntry.MaxSearchResults)
+		results, err := redisconn.SearchEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings, cacheEntry.MaxSearchResults)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error performing ANN search")
 			return

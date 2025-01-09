@@ -8,15 +8,15 @@ import (
 	"api_gateway/logger"
 )
 
-// AssignToRedisMaster tries to find an active Redis master
+// AssignToIndexingNode tries to find an active Redis master
 // with enough free capacity to handle the requestedMemoryBytes.
-// If found, it assigns the node by creating a record in wp_client_requests
+// If found, it assigns the node by creating a record in wp_thinkpixel_index_requests
 // and updating the master’s assigned_memory_bytes.
 // If not found, it logs an error, inserts a 'rejected' (or 'pending') request,
 // but does NOT fail overall activation.
 //
 // It uses a transaction + SELECT FOR UPDATE for concurrency safety.
-func AssignToRedisMaster(apiKeyID int, requestedMemoryBytes uint64) error {
+func AssignToIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func AssignToRedisMaster(apiKeyID int, requestedMemoryBytes uint64) error {
 	//    The FOR UPDATE ensures we lock the row until the end of the transaction.
 	query := `
         SELECT id, assigned_memory_bytes, master_name, sentinel_name
-        FROM wp_redis_masters
+        FROM wp_thinkpixel_index_nodes
         WHERE status = 'active'
           AND max_capacity_bytes - GREATEST(used_memory_bytes, assigned_memory_bytes) >= ?
         ORDER BY (max_capacity_bytes - GREATEST(used_memory_bytes, assigned_memory_bytes)) ASC
@@ -62,16 +62,16 @@ func AssignToRedisMaster(apiKeyID int, requestedMemoryBytes uint64) error {
 		if errors.Is(scanErr, sql.ErrNoRows) {
 			// No capacity found on any active node. Log, but do not fail activation.
 			logger.Warningf("[WARN] No Redis master node can accommodate %d bytes for API key %d",
-				requestedMemoryBytes, apiKeyID,
+				requestedMemoryBytes, siteId,
 			)
 
-			// Create a wp_client_requests record with 'rejected' (or 'pending') status
+			// Create a wp_thinkpixel_index_requests record with 'rejected' (or 'pending') status
 			// to indicate the request was made but could not be fulfilled.
 			insertReq := `
-                INSERT INTO wp_client_requests (api_key_id, requested_memory_bytes, status)
+                INSERT INTO wp_thinkpixel_index_requests (site_id, requested_memory_bytes, status)
                 VALUES (?, ?, 'rejected')
             `
-			if _, err = tx.Exec(insertReq, apiKeyID, requestedMemoryBytes); err != nil {
+			if _, err = tx.Exec(insertReq, siteId, requestedMemoryBytes); err != nil {
 				logger.Errorf("Failed to insert rejected client request: %v", err)
 				return err
 			}
@@ -86,7 +86,7 @@ func AssignToRedisMaster(apiKeyID int, requestedMemoryBytes uint64) error {
 
 	// 2) We found a master. Update its assigned_memory_bytes to reserve capacity for this request.
 	updateMaster := `
-        UPDATE wp_redis_masters
+        UPDATE wp_thinkpixel_index_nodes
         SET assigned_memory_bytes = assigned_memory_bytes + ?
         WHERE id = ?
     `
@@ -97,28 +97,28 @@ func AssignToRedisMaster(apiKeyID int, requestedMemoryBytes uint64) error {
 
 	// 3) Insert the client request record, marking it as 'assigned'.
 	insertReq := `
-        INSERT INTO wp_client_requests (
-            api_key_id,
+        INSERT INTO wp_thinkpixel_index_requests (
+            site_id,
             requested_memory_bytes,
             status,
             assigned_node_id,
             assigned_at
         ) VALUES (?, ?, 'assigned', ?, NOW())
     `
-	if _, err = tx.Exec(insertReq, apiKeyID, requestedMemoryBytes, masterID); err != nil {
+	if _, err = tx.Exec(insertReq, siteId, requestedMemoryBytes, masterID); err != nil {
 		logger.Errorf("Failed to insert assigned client request: %v", err)
 		return err
 	}
 
 	// 4) Update the ApiKey record to reflect the assigned node.
 	updateKey := `
-        UPDATE wp_api_keys
-        SET redis_server = ?
+        UPDATE wp_thinkpixel_sites
+        SET indexing_node = ?
         WHERE id = ?
     `
-	redisServer := fmt.Sprintf("%s:%d/%s", sentinelName, 26379, masterName)
-	if _, err = tx.Exec(updateKey, redisServer, apiKeyID); err != nil {
-		logger.Errorf("Failed to update Redis server on API key %d: %v", apiKeyID, err)
+	indexingNode := fmt.Sprintf("%s:%d/%s", sentinelName, 26379, masterName)
+	if _, err = tx.Exec(updateKey, indexingNode, siteId); err != nil {
+		logger.Errorf("Failed to update Redis server on API key %d: %v", siteId, err)
 		return err
 	}
 

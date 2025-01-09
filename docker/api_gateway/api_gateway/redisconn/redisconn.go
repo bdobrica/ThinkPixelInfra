@@ -31,12 +31,12 @@ var (
 )
 
 // extract redis host, port and master name from redis server string
-func extractRedisServerInfo(redisServer string) (host string, port string, masterName string, err error) {
+func extractIndexingNodeInfo(indexingNode string) (host string, port string, masterName string, err error) {
 	// Split the string into host:port and masterName
-	parts := strings.Split(redisServer, "/")
+	parts := strings.Split(indexingNode, "/")
 	if len(parts) != 2 {
-		logger.Errorf("Invalid RedisServer format: %s\n", redisServer)
-		return "", "", "", fmt.Errorf("Invalid RedisServer format: %s", redisServer)
+		logger.Errorf("Invalid IndexingNode format: %s\n", indexingNode)
+		return "", "", "", fmt.Errorf("Invalid IndexingNode format: %s", indexingNode)
 	}
 
 	hostPort := parts[0]
@@ -45,8 +45,8 @@ func extractRedisServerInfo(redisServer string) (host string, port string, maste
 	// Split host:port into host and port
 	hostPortParts := strings.Split(hostPort, ":")
 	if len(hostPortParts) != 2 {
-		logger.Errorf("Invalid RedisServer format: %s\n", redisServer)
-		return "", "", "", fmt.Errorf("Invalid RedisServer format: %s", redisServer)
+		logger.Errorf("Invalid IndexingNode format: %s\n", indexingNode)
+		return "", "", "", fmt.Errorf("Invalid IndexingNode format: %s", indexingNode)
 	}
 
 	host = hostPortParts[0]
@@ -55,12 +55,12 @@ func extractRedisServerInfo(redisServer string) (host string, port string, maste
 	return host, port, masterName, nil
 }
 
-// initializeRedisClient initializes a new Redis client based on RedisServer string
-func initializeRedisClient(redisServer string) (*redis.Client, error) {
-	// Parse RedisServer string
-	host, port, masterName, err := extractRedisServerInfo(redisServer)
+// initializeRedisClient initializes a new Redis client based on IndexingNode string
+func initializeRedisClient(indexingNode string) (*redis.Client, error) {
+	// Parse IndexingNode string
+	host, port, masterName, err := extractIndexingNodeInfo(indexingNode)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid RedisServer format: %s", redisServer)
+		return nil, fmt.Errorf("Invalid IndexingNode format: %s", indexingNode)
 	}
 
 	sentinelAddr := fmt.Sprintf("%s:%s", host, port)
@@ -86,17 +86,17 @@ func initializeRedisClient(redisServer string) (*redis.Client, error) {
 	return client, nil
 }
 
-// getRedisClient retrieves or creates a Redis client for a given RedisServer string
-func getRedisClient(redisServer string) (*redis.Client, error) {
+// getRedisClient retrieves or creates a Redis client for a given IndexingNode string
+func getRedisClient(indexingNode string) (*redis.Client, error) {
 	// Check cache for existing client
-	if entry, ok := clientCache.Load(redisServer); ok {
+	if entry, ok := clientCache.Load(indexingNode); ok {
 		cacheEntry := entry.(redisClientCacheEntry)
 		if time.Now().Before(cacheEntry.expiresAt) {
 			// Valid client found in cache
 			return cacheEntry.client, nil
 		}
 		// Expired client, remove it
-		clientCache.Delete(redisServer)
+		clientCache.Delete(indexingNode)
 	}
 
 	// Create a new client
@@ -104,21 +104,21 @@ func getRedisClient(redisServer string) (*redis.Client, error) {
 	defer clientCacheLock.Unlock()
 
 	// Double-check to avoid race condition
-	if entry, ok := clientCache.Load(redisServer); ok {
+	if entry, ok := clientCache.Load(indexingNode); ok {
 		cacheEntry := entry.(redisClientCacheEntry)
 		if time.Now().Before(cacheEntry.expiresAt) {
 			return cacheEntry.client, nil
 		}
-		clientCache.Delete(redisServer)
+		clientCache.Delete(indexingNode)
 	}
 
-	client, err := initializeRedisClient(redisServer)
+	client, err := initializeRedisClient(indexingNode)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Redis client for %s: %w", redisServer, err)
+		return nil, fmt.Errorf("Failed to create Redis client for %s: %w", indexingNode, err)
 	}
 
 	// Cache the new client with expiration
-	clientCache.Store(redisServer, redisClientCacheEntry{
+	clientCache.Store(indexingNode, redisClientCacheEntry{
 		client:    client,
 		expiresAt: time.Now().Add(clientCacheTTL),
 	})
@@ -127,14 +127,14 @@ func getRedisClient(redisServer string) (*redis.Client, error) {
 }
 
 // StoreEmbeddings stores embeddings and associated metadata in Redis
-func StoreEmbeddings(siteID int, redisServer string, embeddings []model.EmbeddingResponse) (int, error) {
+func StoreEmbeddings(siteID int, indexingNode string, embeddings []model.EmbeddingResponse) (int, error) {
 	ctx := context.Background()
 	storedCount := 0
 	prefix := fmt.Sprintf("%d:", siteID)
 	indexName := fmt.Sprintf("index:%d", siteID)
 	logger.Debugf("Storing %d embeddings with prefix %s in index %s", len(embeddings), prefix, indexName)
 
-	client, err := getRedisClient(redisServer)
+	client, err := getRedisClient(indexingNode)
 	if err != nil {
 		return storedCount, fmt.Errorf("Failed to get Redis client: %w", err)
 	}
@@ -188,13 +188,13 @@ func StoreEmbeddings(siteID int, redisServer string, embeddings []model.Embeddin
 }
 
 // SearchEmbeddings performs ANN search for a set of embeddings and returns top results
-func SearchEmbeddings(siteId int, redisServer string, embeddings []model.EmbeddingResponse, limit int) ([]map[string]interface{}, error) {
+func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.EmbeddingResponse, limit int) ([]map[string]interface{}, error) {
 	ctx := context.Background()
 	results := []map[string]interface{}{}
 	indexName := fmt.Sprintf("index:%d", siteId)
 	logger.Debugf("Searching embeddings in index %s", indexName)
 
-	client, err := getRedisClient(redisServer)
+	client, err := getRedisClient(indexingNode)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get Redis client: %w", err)
 	}
