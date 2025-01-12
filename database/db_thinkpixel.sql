@@ -58,3 +58,9 @@ CREATE TABLE IF NOT EXISTS `wp_thinkpixel_index_requests` (
         FOREIGN KEY (`site_id`) REFERENCES `wp_thinkpixel_sites`(`id`)
         ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS `wp_thinkpixel_db_version` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `version` VARCHAR(16) NOT NULL,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

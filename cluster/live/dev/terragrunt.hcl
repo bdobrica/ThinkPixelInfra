@@ -21,13 +21,13 @@ inputs = merge(
         location = "fsn1"
         os_image = "debian-12"
         master_pool = {
-            server_type = "cx22"
+            server_type = "cax21"
             count = 1
         }
         worker_pools = {
             pool1 = {
-                server_type = "cx22"
-                count = 2
+                server_type = "cax21"
+                count = 3
             }
         }
     },
