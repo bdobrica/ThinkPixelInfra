@@ -31,6 +31,7 @@ weights
 .secrets.hcl
 *.key
 *-secret.yaml
+!sealed-secret.yaml
 !*-sealed-secret.yaml
 *-secrets.yaml
 !*-sealed-secrets.yaml
