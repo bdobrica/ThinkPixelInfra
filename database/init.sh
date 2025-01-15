@@ -103,7 +103,7 @@ else
 fi
 
 echo_green "=== [Init Script] Initializing database schema ==="
-if [[ ! -f "${SQL_INIT_FILE}" ]]; then
+if [[ -f "${SQL_INIT_FILE}" ]]; then
   mysql \
     --host="$MYSQL_HOST" \
     --port="$MYSQL_PORT" \
