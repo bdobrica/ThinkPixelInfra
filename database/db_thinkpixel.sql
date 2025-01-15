@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `wp_thinkpixel_index_requests` (
     INDEX(status),
     INDEX(`assigned_node_id`),
     CONSTRAINT `fk_assigned_node`
-        FOREIGN KEY (`assigned_node_id`) REFERENCES `wp_thinkpixel_redis_nodes`(`id`)
+        FOREIGN KEY (`assigned_node_id`) REFERENCES `wp_thinkpixel_index_nodes`(`id`)
         ON DELETE SET NULL,
     CONSTRAINT `fk_site_id`
         FOREIGN KEY (`site_id`) REFERENCES `wp_thinkpixel_sites`(`id`)
