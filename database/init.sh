@@ -97,6 +97,13 @@ if ! db_exists; then
   # Create DB + run init script
   # If your init script itself does CREATE DATABASE, you can skip the CREATE DB line here.
   mysql_query "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  echo_green "Database '${MYSQL_DATABASE}' created."
+else
+  echo_green "Database '${MYSQL_DATABASE}' already exists."
+fi
+
+echo_green "=== [Init Script] Initializing database schema ==="
+if [[ ! -f "${SQL_INIT_FILE}" ]]; then
   mysql \
     --host="$MYSQL_HOST" \
     --port="$MYSQL_PORT" \
@@ -106,9 +113,9 @@ if ! db_exists; then
         echo_red "Failed to initialize database '${MYSQL_DATABASE}' from '${SQL_INIT_FILE}'"
         exit 1
     }
-  echo_green "Database '${MYSQL_DATABASE}' created and initialized."
+    echo_green "Database schema initialized."
 else
-  echo_green "Database '${MYSQL_DATABASE}' already exists."
+    echo_yellow "No init script found at '${SQL_INIT_FILE}'; skipping."
 fi
 
 echo_green "=== [Init Script] Checking current DB version ==="
