@@ -17,51 +17,24 @@ spec:
           image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.1.6-dev
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
+            - secretRef:
+                name: redis-secret
+            - secretRef:
+                name: mysql-secret
+            - secretRef:
+                name: api-gateway-secret
           env:
-            - name: API_GATEWAY_MYSQL_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: api-gateway-mysql-host
-            - name: API_GATEWAY_MYSQL_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: api-gateway-mysql-port
-            - name: API_GATEWAY_MYSQL_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: api-gateway-mysql-user
-            - name: API_GATEWAY_MYSQL_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: api-gateway-mysql-db
-            - name: API_GATEWAY_MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: user-password
-            - name: API_GATEWAY_REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: redis-password
-            - name: API_GATEWAY_MODEL_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: api-gateway-config
-                  key: api-gateway-model-url
             - name: API_GATEWAY_DB_DSN
-              value: "$(API_GATEWAY_MYSQL_USER):$(API_GATEWAY_MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
+              value: "$(API_GATEWAY_MYSQL_USER):$(MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
           resources:
             limits:
-              cpu: 200m
               memory: 512Mi
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 512Mi
       imagePullSecrets:
         - name: quay-io-credentials
 

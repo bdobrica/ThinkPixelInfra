@@ -12,3 +12,7 @@ patches:
     target:
       kind: SealedSecret
       name: quay-io-secret
+  - path: api-gateway-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: api-gateway-secret

@@ -19,26 +19,18 @@ spec:
             - containerPort: 3306
           resources:
             limits:
-              cpu: 500m
               memory: 2Gi
             requests:
               cpu: 250m
-              memory: 512Mi
+              memory: 2Gi
+          envFrom:
+            - secretRef:
+                name: mysql-secret
           env:
-            - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: root-password
             - name: MYSQL_DATABASE
               value: thinkpixel
             - name: MYSQL_USER
               value: thinkpixel
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mysql-secret
-                  key: user-password
           volumeMounts:
             - name: mysql-storage
               mountPath: /var/lib/mysql
