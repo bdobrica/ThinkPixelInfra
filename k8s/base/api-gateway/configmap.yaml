@@ -3,8 +3,14 @@ kind: ConfigMap
 metadata:
   name: api-gateway-config
 data:
-  api-gateway-model-url: http://ml-model:8000/infer
-  api-gateway-mysql-host: mysql
-  api-gateway-mysql-port: "3306"
-  api-gateway-mysql-user: thinkpixel
-  api-gateway-mysql-db: thinkpixel
+  API_GATEWAY_JWT_SECRET: supersecret
+  API_GATEWAY_MODEL_URL: http://ml-model:8000/infer
+  API_GATEWAY_MYSQL_HOST: mysql
+  API_GATEWAY_MYSQL_PORT: "3306"
+  API_GATEWAY_MYSQL_USER: thinkpixel
+  API_GATEWAY_MYSQL_DB: thinkpixel
+  API_GATEWAY_VALIDATION_SUFFIX: "?rest_route=/thinkpixel/v1/validate/"
+  API_GATEWAY_VALIDATION_TIMEOUT: 5s
+  API_GATEWAY_VALIDATION_MAX_ATTEMPTS: "3"
+
+

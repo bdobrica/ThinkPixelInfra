@@ -22,9 +22,8 @@ spec:
           resources:
             limits:
               memory: 2Gi
-              cpu: 500m
             requests:
-              memory: 512Mi
+              memory: 2Gi
               cpu: 250m
           env:
             - name: POD_NAME
@@ -49,7 +48,8 @@ spec:
               redis-stack-server \
               --appendonly yes \
               --requirepass ${REDIS_PASSWORD} \
-              --replicaof redis-master-$SUFFIX 6379
+              --replicaof redis-master-$SUFFIX 6379 \
+              --maxmemory 1800mb
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

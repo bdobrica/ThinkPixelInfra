@@ -20,23 +20,20 @@ spec:
           resources:
             limits:
               memory: 2Gi
-              cpu: 500m
             requests:
-              memory: 512Mi
+              memory: 2Gi
               cpu: 250m
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: redis-password
+          envFrom:
+            - secretRef:
+                name: redis-secret
           command:
             - /bin/sh
             - -c
             - |
               redis-stack-server \
               --appendonly yes \
-              --requirepass ${REDIS_PASSWORD}
+              --requirepass ${REDIS_PASSWORD} \
+              --maxmemory 1800mb
           ports:
             - containerPort: 6379
       affinity:

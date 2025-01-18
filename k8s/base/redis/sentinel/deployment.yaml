@@ -23,12 +23,9 @@ spec:
       initContainers:
         - name: configure-sentinel
           image: busybox:1.35
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: redis-password
+          envFrom:
+            - secretRef:
+                name: redis-secret
           command:
             - /bin/sh
             - -c
@@ -49,6 +46,12 @@ spec:
                 fi
               done < /etc/config-template/masters
               echo "requirepass ${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              memory: 128Mi
+              cpu: 100m
           volumeMounts:
             - name: sentinel-config
               mountPath: /etc/sentinel
@@ -62,6 +65,12 @@ spec:
             - /etc/sentinel/sentinel.conf
           ports:
             - containerPort: 26379
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              memory: 128Mi
+              cpu: 100m
           volumeMounts:
             - name: sentinel-config
               mountPath: /etc/sentinel
