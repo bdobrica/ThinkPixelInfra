@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.1.6-dev
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.1.7
           ports:
             - containerPort: 8080
           envFrom:
