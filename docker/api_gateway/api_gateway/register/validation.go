@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -14,13 +15,14 @@ import (
 )
 
 type ValidationResponse struct {
-	Domain      string `json:"domain"`
-	Path        string `json:"path"`
-	SaltedToken string `json:"salted_token"`
+	Domain          string `json:"domain"`
+	Path            string `json:"path"`
+	ValidationToken string `json:"validation_token"`
+	Nonce           string `json:"nonce"`
 }
 
-func verifyDomain(domain string, path string, salt string, token string) {
-	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "wp-content/plugins/thinkpixel/rpc/validate/")
+func verifyDomain(domain, path, token string) {
+	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "?rest_route=/thinkpixel/v1/validate/")
 	timeoutStr := config.GetEnv("API_GATEWAY_VALIDATION_TIMEOUT", "5s")
 	timeout, err := time.ParseDuration(timeoutStr)
 	if err != nil {
@@ -35,80 +37,141 @@ func verifyDomain(domain string, path string, salt string, token string) {
 	}
 	maxAttempts := int32(maxAttemptsRaw)
 
-	url := fmt.Sprintf("https://%s%s/%s", domain, path, validationSuffix)
+	url := fmt.Sprintf("https://%s%s%s", domain, path, validationSuffix)
 	client := http.Client{Timeout: timeout}
 
 	logger.Infof("Validate domain %s%s with token %s (attempts: %d)", domain, path, token, maxAttempts)
 
 	// Atomic counter to track attempts
-	var attemptCounter int32
+	var (
+		attemptCounter int32
+		timers         []*time.Timer
+		once           sync.Once
+	)
 
-	// Immediate first attempt
-	executeValidation(client, url, domain, path, salt, token, &attemptCounter, maxAttempts)
+	successChan := make(chan struct{})
+	doneChan := make(chan struct{}) // To signal all attempts are finished
 
 	// Schedule retries asynchronously with exponential backoff
-	for i := int32(1); i < maxAttempts; i++ {
-		delay := time.Duration(1<<i) * time.Second // Exponential backoff: 2^i seconds
-		time.AfterFunc(delay, func() {
-			executeValidation(client, url, domain, path, salt, token, &attemptCounter, maxAttempts)
+	for i := int32(0); i < maxAttempts; i++ {
+		var delay time.Duration
+		if i > 0 {
+			delay = (1<<(i-1))*timeout + time.Second
+		} else {
+			delay = time.Duration(0)
+		}
+		timer := time.AfterFunc(delay, func() {
+			select {
+			case <-successChan:
+				return
+			default:
+				err := executeValidation(client, url, domain, path, token, &attemptCounter, maxAttempts)
+				if err != nil {
+					logger.Errorf("Validation failed for %s%s (attempt %d): %v", domain, path, attemptCounter, err)
+				} else {
+					logger.Infof("Validation succeeded for %s%s", domain, path)
+					once.Do(func() {
+						close(successChan) // Notify all listeners and ensure resources are cleaned up
+					})
+				}
+			}
 		})
+		timers = append(timers, timer)
 	}
+
+	// Clean up timers when success occurs
+	go func() {
+		select {
+		case <-successChan: // Success case
+			logger.Infof("Validation succeeded for %s%s. Stopping running timers", domain, path)
+			for _, timer := range timers {
+				if timer != nil {
+					timer.Stop() // Stop all timers
+				}
+			}
+		case <-doneChan: // All attempts finished without success
+			logger.Errorf("Validation failed for %s%s after %d attempts", domain, path, maxAttempts)
+			return
+		}
+	}()
+
+	// Wait for all attempts to finish
+	go func() {
+		logger.Infof("Waiting for all attempts to finish for %s%s", domain, path)
+		delay := time.Duration(0)
+		for i := int32(1); i < maxAttempts; i++ {
+			delay += (1<<(i-1))*timeout + time.Second
+		}
+		time.Sleep(delay) // Wait until the last timer should fire
+		logger.Infof("All attempts finished for %s%s", domain, path)
+		close(doneChan) // Signal that all retries are done
+	}()
 }
 
-func executeValidation(client http.Client, url string, domain string, path string, salt string, token string, attemptCounter *int32, maxAttempts int32) {
+func executeValidation(client http.Client, url string, domain string, path string, token string, attemptCounter *int32, maxAttempts int32) error {
+	logger.Infof("Executing validation for %s", url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		logger.Errorf("Failed to create validation request: %v", err)
-		return
+		return fmt.Errorf("failed to create validation request: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Errorf("Validation request failed for %s: %v", url, err)
-		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts)
-		return
+		err = fmt.Errorf("validation request failed for %s: %v", url, err)
+		return checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Infof("Validation failed for %s with status code %d", url, resp.StatusCode)
-		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts)
-		return
+		err = fmt.Errorf("validation failed for %s with status code %d", url, resp.StatusCode)
+		return checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
 	}
 
 	var validationResponse ValidationResponse
 	if err := json.NewDecoder(resp.Body).Decode(&validationResponse); err != nil {
-		logger.Errorf("Failed to decode validation response: %v", err)
-		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts)
-		return
+		err = fmt.Errorf("failed to decode validation response: %v", err)
+		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
 	}
 
-	validationToken, _, err := db.GetPendingTokenDetails(validationResponse.Domain, validationResponse.Path)
+	validationToken, validationTokenExpiresAt, err := db.GetPendingTokenDetails(validationResponse.Domain, validationResponse.Path)
 	if err != nil {
-		logger.Errorf("Failed to retrieve validation token details for domain: %s, path: %s, salt: %s: %v", validationResponse.Domain, validationResponse.Path, salt, err)
-		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts)
-		return
+		err = fmt.Errorf("failed to retrieve validation token details for domain: %s and path: %s: %v", validationResponse.Domain, validationResponse.Path, err)
+		return checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
 	}
 
-	// Validate the response: proof that the requester knows the salted token and the salt
-	saltedToken := saltMessage(saltMessage(validationToken, salt), salt)
-	if saltedToken == validationResponse.SaltedToken {
+	if time.Now().After(validationTokenExpiresAt) {
+		err = fmt.Errorf("validation token has expired for %s%s", domain, path)
+		return checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
+	}
+
+	// Validate the token
+	if validationToken == validationResponse.ValidationToken {
 		if err := db.VerifyToken(token, domain, path); err != nil {
-			logger.Errorf("Failed to mark token as verified: %v", err)
+			logger.Errorf("failed to mark token as verified: %v", err)
 		} else {
 			logger.Infof("Validation succeeded for %s", url)
 		}
 	} else {
-		checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts)
+		err = fmt.Errorf("validation token mismatch for %s%s", domain, path)
+		return checkFinalAttempt(domain, path, token, attemptCounter, maxAttempts, err)
 	}
+
+	// Trigger key exchange asynchronously and handle any errors
+	go func() {
+		if err := triggerKeyExchange(domain, path, validationResponse.Nonce); err != nil {
+			logger.Errorf("Key exchange failed for %s%s: %v", domain, path, err)
+		}
+	}()
+	return nil
 }
 
-func checkFinalAttempt(domain, path, token string, attemptCounter *int32, maxAttempts int32) {
+func checkFinalAttempt(domain, path, token string, attemptCounter *int32, maxAttempts int32, passedError error) error {
 	if atomic.AddInt32(attemptCounter, 1) == maxAttempts {
 		if err := db.FailToken(token, domain, path); err != nil {
-			logger.Errorf("Failed to mark token as failed: %v", err)
+			return fmt.Errorf("final attempt failed: %v, failed to mark token as failed: %v", passedError, err)
 		} else {
-			logger.Infof("Final validation attempt failed. Token marked as failed for %s%s", domain, path)
+			return fmt.Errorf("final attempt failed: %v, token marked as failed", passedError)
 		}
 	}
+	return passedError
 }

@@ -6,10 +6,10 @@ INSERT INTO `wp_thinkpixel_sites` (
     `user_id`,
     `status`,
     `rate_limit`,
-    `request_salt`,
     `verification_token`,
     `verification_method`,
     `verification_status`,
+    `verification_token_expires_at`,
     `created_at`,
     `updated_at`,
     `expires_at`,
@@ -31,10 +31,10 @@ INSERT INTO `wp_thinkpixel_sites` (
     1, -- Associated WordPress user ID
     'active', -- Key is active
     1000, -- Rate limit of 1000 requests per day
-    'f7c2f8170b5dfd3eabbe848bc9e1f94', -- Salt for the request signature
     '4f7c2f8170b5dfd3eabbe848bc9e1f94', -- Unique verification token
     'http', -- Verification method used
     'verified', -- Verification status
+    DATE_ADD(NOW(), INTERVAL 1 DAY), -- Verification token expires in 1 day
     NOW(), -- Current timestamp for creation
     NOW(), -- Current timestamp for last update
     NULL, -- No expiration date

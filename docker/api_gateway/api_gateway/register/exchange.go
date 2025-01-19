@@ -1,72 +1,84 @@
 package register
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
+	"api_gateway/config"
 	"api_gateway/db"
 	"api_gateway/logger"
-	"api_gateway/utils"
 )
 
-type ExchangeRequest struct {
-	Domain      string `json:"domain"`
-	Path        string `json:"path"`
-	SaltedToken string `json:"salted_token"`
+type APIKeyRequest struct {
+	APIKey  string `json:"api_key"`
+	Nonce   string `json:"nonce"`
+	Message string `json:"message"`
 }
 
 type APIKeyResponse struct {
-	APIKey       string `json:"api_key"`
-	SaltedAPIKey string `json:"salted_api_key"`
-	Message      string `json:"message"`
+	Success string `json:"success"`
+	Message string `json:"message"`
 }
 
-func exchangeTokenForAPIKey(domain, path, saltedToken string) (string, string, error) {
-	// Stub for database logic
-	logger.Infof("Exchanging token for API key for domain %s and path %s", domain, path)
-
-	validationToken, requestSalt, err := db.GetVerifiedTokenDetails(domain, path)
-	if err != nil {
-		return "", "", fmt.Errorf("Failed to get validation token details: %v", err)
-	}
-
-	if saltedToken != saltMessage(validationToken, requestSalt) {
-		return "", "", fmt.Errorf("Invalid salted token %s", saltedToken)
-	}
-
-	// Generate and return a new API key
+func triggerKeyExchange(domain, path, nonce string) error {
+	keyExchangeSuffix := config.GetEnv("API_GATEWAY_KEY_EXCHANGE_SUFFIX", "?rest_route=/thinkpixel/v1/exchange/")
+	url := fmt.Sprintf("https://%s%s%s", domain, path, keyExchangeSuffix)
 	apiKey := generateAPIKey()
 	logger.Infof("Generated API key for domain %s and path %s", domain, path)
 
-	if err := db.ActivateAPIKey(validationToken, apiKey); err != nil {
-		return "", "", fmt.Errorf("Failed to activate API key for domain %s and path %s: %v", domain, path, err)
-	}
-	saltedAPIKey := saltMessage(apiKey, requestSalt)
-
-	return apiKey, saltedAPIKey, nil
-}
-
-// Handle token exchange for API key
-func ExchangeTokenHandler(w http.ResponseWriter, r *http.Request) {
-	var request ExchangeRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
-		return
+	// Send the API key to the client
+	apiKeyRequest := APIKeyRequest{
+		APIKey:  apiKey,
+		Nonce:   nonce,
+		Message: "Validation successful. Use the API key to access protected routes.",
 	}
 
-	// Verify token and get API key
-	apiKey, saltedApiKey, err := exchangeTokenForAPIKey(request.Domain, request.Path, request.SaltedToken)
+	payloadBytes, err := json.Marshal(apiKeyRequest)
 	if err != nil {
-		utils.RespondWithError(w, http.StatusForbidden, err.Error())
-		return
+		return fmt.Errorf("failed to marshal key exchange payload: %v", err)
 	}
 
-	resp := APIKeyResponse{
-		APIKey:       apiKey,
-		SaltedAPIKey: saltedApiKey,
-		Message:      "Validation successful. Use the API key to access protected routes.",
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create key exchange request: %v", err)
 	}
-	utils.RespondWithJSON(w, http.StatusOK, resp)
+	req.Header.Set("Content-Type", "application/json")
+
+	timeOutStr := config.GetEnv("API_GATEWAY_KEY_EXCHANGE_TIMEOUT", "10s")
+	timeOut, err := time.ParseDuration(timeOutStr)
+	if err != nil {
+		return fmt.Errorf("failed to parse key exchange timeout: %v", err)
+	}
+	client := &http.Client{
+		Timeout: timeOut,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("key exchange request failed for %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("key exchange failed for %s with status code %d", url, resp.StatusCode)
+	}
+
+	var apiKeyResponse APIKeyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiKeyResponse); err != nil {
+		return fmt.Errorf("failed to decode key exchange response: %v", err)
+	}
+
+	if apiKeyResponse.Success != "ok" {
+		return fmt.Errorf("key exchange failed for %s: %s", url, apiKeyResponse.Message)
+	}
+
+	logger.Infof("Key exchange succeeded for %s", url)
+	if err := db.ActivateAPIKey(domain, path, apiKey); err != nil {
+		return fmt.Errorf("failed to activate API key for domain %s and path %s: %v", domain, path, err)
+	}
+
+	return nil
 }

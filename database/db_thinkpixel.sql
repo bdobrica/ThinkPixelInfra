@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS `wp_thinkpixel_sites` (
     `user_id` BIGINT DEFAULT NULL, -- Links to the WordPress `wp_users` table
     `status` ENUM('active', 'revoked', 'suspended') DEFAULT 'active', -- API key status
     `rate_limit` INT DEFAULT NULL, -- Optional: rate limit for the key
-    `request_salt` VARCHAR(64) DEFAULT NULL, -- Salt for the request signature
     `validation_token` VARCHAR(64) DEFAULT NULL, -- Unique token for ownership verification
+    `validation_token_expires_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Expiration date for the verification token
     `validation_method` ENUM('dns', 'file', 'email', 'http') DEFAULT NULL, -- Chosen verification method
     `validation_status` ENUM('pending', 'verified', 'failed') DEFAULT 'pending', -- Verification status
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp

@@ -273,7 +273,6 @@ curl -X POST http://api-gateway:8080/register \
 -d '{
   "domain": "example.com",
   "path": "/shop/",
-  "salt": "random-salt-value",
   "estimated_pages": 415,
   "average_page_size": 1478,
   "st_dev_page_size": 4891

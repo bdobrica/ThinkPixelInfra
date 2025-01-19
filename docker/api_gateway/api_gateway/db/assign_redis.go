@@ -120,6 +120,8 @@ func AssignToIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 	if _, err = tx.Exec(updateKey, indexingNode, siteId); err != nil {
 		logger.Errorf("Failed to update Redis server on API key %d: %v", siteId, err)
 		return err
+	} else {
+		logger.Infof("Assigned Redis master %d to API key %d", masterID, siteId)
 	}
 
 	// Transaction will commit in deferred function if there are no errors.

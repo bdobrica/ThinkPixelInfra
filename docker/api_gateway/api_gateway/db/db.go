@@ -4,13 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
 	"api_gateway/config"
 	"api_gateway/logger"
 	"api_gateway/utils"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -24,6 +24,7 @@ func GetDBConnection() (*sql.DB, error) {
 	var err error
 	initOnce.Do(func() {
 		dsn := config.GetEnv("API_GATEWAY_DB_DSN", "thinkpixel:thinkpixel@tcp(mysql:3306)/thinkpixel")
+		dsn += "?parseTime=true"
 		dbInstance, err = sql.Open("mysql", dsn)
 		if err != nil {
 			return
@@ -65,9 +66,9 @@ func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
 	var maxSearchResults int
 	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("Database query error")
+		return 0, "", time.Time{}, 0, errors.New("database query error")
 	}
 
 	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
@@ -93,106 +94,107 @@ func GetAPIKeyDetailsByID(siteId int) (int, string, time.Time, int, error) {
 	var maxSearchResults int
 	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("Invalid API key")
+			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("Database query error")
+		return 0, "", time.Time{}, 0, errors.New("database query error")
 	}
 
 	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
 }
 
 // StoreRegistrationData stores registration data in the database
-func StoreRegistrationData(domain string, path string, requestSalt string, validationToken string, estimatedPages int, averagePageSize int, stDevPageSize int) error {
+func StoreRegistrationData(domain, path, validationToken string, validationTokenExpiresAt time.Time, estimatedPages, averagePageSize, stDevPageSize int) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
 	}
 
-	logger.Infof("Storing registration data for domain %s and path %s: requestSalt=%s, token=%s, estimatedPages=%d, averagePageSize=%d, stDevPageSize=%d", domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
+	logger.Infof("Storing registration data for domain %s and path %s: token=%s, expires=%s, estimatedPages=%d, averagePageSize=%d, stDevPageSize=%d", domain, path, validationToken, validationTokenExpiresAt, estimatedPages, averagePageSize, stDevPageSize)
 
 	query := `
-		INSERT INTO wp_thinkpixel_sites (domain, path, request_salt, validation_token, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
-		VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')`
+        INSERT INTO wp_thinkpixel_sites (domain, path, validation_token, validation_token_expires_at, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
+        VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')`
 
-	_, err = dbConn.Exec(query, domain, path, requestSalt, validationToken, estimatedPages, averagePageSize, stDevPageSize)
+	_, err = dbConn.Exec(query, domain, path, validationToken, validationTokenExpiresAt, estimatedPages, averagePageSize, stDevPageSize)
 	if err != nil {
-		logger.Errorf("Failed to store registration data: %v", err)
-		return errors.New("Failed to store registration data: " + err.Error())
+		return fmt.Errorf("failed to store registration data: %v", err)
 	}
 
 	return nil
 }
 
 // GetValidationTokenDetails retrieves validation token details for pending status
-func getValidationTokenDetails(domain, path, validationStatus string) (string, string, error) {
+func getValidationTokenDetails(domain, path, validationStatus string) (string, time.Time, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
-		return "", "", err
+		return "", time.Now(), err
 	}
 
 	query := `
-		SELECT validation_token, request_salt
+		SELECT validation_token, validation_token_expires_at
 		FROM wp_thinkpixel_sites
 		WHERE domain = ? AND path = ? AND validation_status = ?`
 
 	row := dbConn.QueryRow(query, domain, path, validationStatus)
 
 	var (
-		validationToken string
-		requestSalt     string
+		validationToken          string
+		validationTokenExpiresAt sql.NullTime
 	)
-	if err := row.Scan(&validationToken, &requestSalt); err != nil {
+	if err := row.Scan(&validationToken, &validationTokenExpiresAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", "", fmt.Errorf("No %s validation token found", validationStatus)
+			return "", time.Now(), fmt.Errorf("no %s validation token found", validationStatus)
 		}
-		return "", "", errors.New("Database query error")
+		return "", time.Now(), fmt.Errorf("database query error %v", err)
 	}
 
-	return validationToken, requestSalt, nil
+	return validationToken, validationTokenExpiresAt.Time, nil
 }
 
-func GetPendingTokenDetails(domain, path string) (string, string, error) {
+func GetPendingTokenDetails(domain, path string) (string, time.Time, error) {
 	return getValidationTokenDetails(domain, path, "pending")
 }
 
-func GetFailedTokenDetails(domain, path string) (string, string, error) {
+func GetFailedTokenDetails(domain, path string) (string, time.Time, error) {
 	return getValidationTokenDetails(domain, path, "failed")
 }
 
-func GetVerifiedTokenDetails(domain, path string) (string, string, error) {
+func GetVerifiedTokenDetails(domain, path string) (string, time.Time, error) {
 	return getValidationTokenDetails(domain, path, "verified")
 }
 
 // ActivateAPIKey updates the API key and status to active for a given validation token
-func ActivateAPIKey(validationToken string, apiKey string) error {
+func ActivateAPIKey(domain, path, apiKey string) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
 	}
 
-	validityDaysStr := config.GetEnv("API_GATEWAY_API_KEY_VALIDITY", "30")
-	validityDays, err := strconv.Atoi(validityDaysStr)
+	validityStr := config.GetEnv("API_GATEWAY_API_KEY_VALIDITY", "720h")
+	validity, err := time.ParseDuration(validityStr)
 	if err != nil {
-		return errors.New("Failed to parse API_GATEWAY_API_KEY_VALIDITY: " + err.Error())
+		return fmt.Errorf("failed to parse API_GATEWAY_API_KEY_VALIDITY: %v", err)
 	}
 
-	expiresAt := time.Now().AddDate(0, 0, validityDays)
+	expiresAt := time.Now().Add(validity)
 	query := `
 		UPDATE wp_thinkpixel_sites
 		SET api_key = ?, status = 'active', updated_at = NOW(), verified_at = NOW(), expires_at = ?
-		WHERE validation_token = ? AND validation_status = 'verified'`
+		WHERE domain = ? AND path = ? AND validation_status = 'verified'`
 
-	result, err := dbConn.Exec(query, apiKey, expiresAt, validationToken)
+	result, err := dbConn.Exec(query, apiKey, expiresAt, domain, path)
 	if err != nil {
-		return errors.New("Failed to activate API key: " + err.Error())
+		return fmt.Errorf("failed to activate API key: %v", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return errors.New("Failed to retrieve affected rows: " + err.Error())
+		return fmt.Errorf("failed to retrieve affected rows: %v", err)
 	}
 	if affected == 0 {
-		return errors.New("No matching record found to activate")
+		return errors.New("no matching record found to activate")
+	} else {
+		logger.Infof("API key activated for %s%s", domain, path)
 	}
 
 	// Retrieve the ID of the API key row you just activated, since it's the foreign key in wp_thinkpixel_index_requests.
@@ -216,6 +218,8 @@ func ActivateAPIKey(validationToken string, apiKey string) error {
 
 	// Estimate the memory needed for the API key and assign it to a Redis master
 	var requestedBytes uint64 = utils.EstimateMemory(estimatedPages, averagePageSize, stDevPageSize)
+
+	logger.Infof("Estimated memory for site %d: %d Mb", siteId, requestedBytes>>20)
 
 	// Call the concurrency-safe function to assign a Redis master, if possible.
 	// Do not fail activation if it fails to find capacity. That is handled in the function’s logic.
@@ -242,15 +246,15 @@ func VerifyToken(validationToken, domain, path string) error {
 
 	result, err := dbConn.Exec(query, validationToken, domain, path)
 	if err != nil {
-		return errors.New("Failed to verify token: " + err.Error())
+		return fmt.Errorf("failed to verify token: %v", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return errors.New("Failed to retrieve affected rows: " + err.Error())
+		return fmt.Errorf("failed to retrieve affected rows: %v", err)
 	}
 	if affected == 0 {
-		return errors.New("Token is already verified or not found")
+		return errors.New("token is already verified or not found")
 	}
 
 	return nil
@@ -270,22 +274,22 @@ func FailToken(validationToken, domain, path string) error {
 
 	result, err := dbConn.Exec(query, validationToken, domain, path)
 	if err != nil {
-		return errors.New("Failed to mark token as failed: " + err.Error())
+		return fmt.Errorf("failed to mark token as failed: %v", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return errors.New("Failed to retrieve affected rows: " + err.Error())
+		return fmt.Errorf("failed to retrieve affected rows: %v", err)
 	}
 	if affected == 0 {
-		return errors.New("Token is already verified or not found")
+		return errors.New("token is already verified or not found")
 	}
 
 	return nil
 }
 
 // ResetValidationStatus resets the validation status for a given domain and path
-func ResetValidationStatus(domain, path, requestSalt string) error {
+func ResetValidationStatus(domain, path, newToken string, newTokenExpiresAt time.Time) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -293,20 +297,20 @@ func ResetValidationStatus(domain, path, requestSalt string) error {
 
 	query := `
         UPDATE wp_thinkpixel_sites
-        SET validation_status = 'pending', request_salt = ?, updated_at = NOW()
+        SET validation_token = ?, validation_token_expires_at = ?, validation_status = 'pending', updated_at = NOW()
         WHERE domain = ? AND path = ? AND validation_status = 'failed'`
 
-	result, err := dbConn.Exec(query, requestSalt, domain, path)
+	result, err := dbConn.Exec(query, newToken, newTokenExpiresAt, domain, path)
 	if err != nil {
-		return errors.New("Failed to reset validation status: " + err.Error())
+		return fmt.Errorf("failed to reset validation status: %v", err)
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return errors.New("Failed to retrieve affected rows: " + err.Error())
+		return fmt.Errorf("failed to retrieve affected rows: %v", err)
 	}
 	if affected == 0 {
-		return errors.New("No matching record found to reset")
+		return errors.New("no matching record found to reset")
 	}
 
 	return nil

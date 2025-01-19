@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
+	"api_gateway/config"
 	"api_gateway/db"
 	"api_gateway/logger"
 	"api_gateway/utils"
@@ -13,24 +15,32 @@ import (
 type RegisterRequest struct {
 	Domain          string `json:"domain"`
 	Path            string `json:"path"`
-	Salt            string `json:"salt"`
 	EstimatedPages  int    `json:"estimated_pages"`
 	AveragePageSize int    `json:"average_page_size"`
 	StDevPageSize   int    `json:"st_dev_page_size"`
 }
 
 type RegisterResponse struct {
-	ValidationToken string `json:"validation_token"`
-	SaltedToken     string `json:"salted_token"`
-	Message         string `json:"message"`
+	ValidationToken          string    `json:"validation_token"`
+	ValidationTokenExpiresAt time.Time `json:"validation_token_expires_at"`
+	Message                  string    `json:"message"`
+}
+
+func getValidationTokenExpiry() (time.Time, error) {
+	verificationTokenExpiry := config.GetEnv("API_GATEWAY_VERIFICATION_TOKEN_EXPIRY", "5m")
+	expiryDuration, err := time.ParseDuration(verificationTokenExpiry)
+	if err != nil {
+		return time.Now(), fmt.Errorf("failed to parse verification token expiry duration: %s", err.Error())
+	}
+	return time.Now().Add(expiryDuration), nil
 }
 
 // Store the registration data in the database
-func storeRegistrationData(req RegisterRequest, token string) error {
+func storeRegistrationData(req RegisterRequest, token string, tokenExpiresAt time.Time) error {
 	logger.Infof("Storing registration data for domain %s and path %s", req.Domain, req.Path)
-	err := db.StoreRegistrationData(req.Domain, req.Path, req.Salt, token, req.EstimatedPages, req.AveragePageSize, req.StDevPageSize)
+	err := db.StoreRegistrationData(req.Domain, req.Path, token, tokenExpiresAt, req.EstimatedPages, req.AveragePageSize, req.StDevPageSize)
 	if err != nil {
-		return fmt.Errorf("Failed to store registration data: %s", err.Error())
+		return fmt.Errorf("failed to store registration data: %s", err.Error())
 	}
 	return nil
 }
@@ -44,30 +54,44 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if a record already exists with the same parameters
-	existingToken, _, err := db.GetFailedTokenDetails(req.Domain, req.Path)
+	_, _, err := db.GetFailedTokenDetails(req.Domain, req.Path)
 	if err == nil {
 		// If the validation has failed, reset it to pending
-		if err := db.ResetValidationStatus(req.Domain, req.Path, req.Salt); err != nil {
+		refreshedToken := generateValidationToken()
+		refreshedTokenExpiresAt, err := getValidationTokenExpiry()
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		if err := db.ResetValidationStatus(req.Domain, req.Path, refreshedToken, refreshedTokenExpiresAt); err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		resp := RegisterResponse{
-			ValidationToken: existingToken,
-			SaltedToken:     saltMessage(existingToken, req.Salt),
-			Message:         "Validation has been reset to pending. Please respond to the challenge.",
+			ValidationToken:          refreshedToken,
+			ValidationTokenExpiresAt: refreshedTokenExpiresAt,
+			Message:                  "Validation has been reset to pending. Please respond to the challenge.",
 		}
 		utils.RespondWithJSON(w, http.StatusOK, resp)
 
 		// Perform asynchronous validation
-		go verifyDomain(req.Domain, req.Path, req.Salt, existingToken)
+		go verifyDomain(req.Domain, req.Path, refreshedToken)
 		return
+	} else {
+		logger.Infof("No failed token found for domain %s and path %s (%v)", req.Domain, req.Path, err)
 	}
 
 	// Generate a validation token
 	validationToken := generateValidationToken()
+	validationTokenExpiresAt, err := getValidationTokenExpiry()
+	if err != nil {
+		utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	// Store the data and token in the database
-	err = storeRegistrationData(req, validationToken)
+	err = storeRegistrationData(req, validationToken, validationTokenExpiresAt)
 	if err != nil {
 		utils.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -75,12 +99,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Respond to the client with the validation token
 	resp := RegisterResponse{
-		ValidationToken: validationToken,
-		SaltedToken:     saltMessage(validationToken, req.Salt),
-		Message:         "Validation initiated. Please respond to the challenge.",
+		ValidationToken:          validationToken,
+		ValidationTokenExpiresAt: validationTokenExpiresAt,
+		Message:                  "Validation initiated. Please respond to the challenge.",
 	}
 	utils.RespondWithJSON(w, http.StatusOK, resp)
 
 	// Perform asynchronous validation
-	go verifyDomain(req.Domain, req.Path, req.Salt, validationToken)
+	go verifyDomain(req.Domain, req.Path, validationToken)
 }
