@@ -29,6 +29,8 @@ spec:
           env:
             - name: API_GATEWAY_DB_DSN
               value: "$(API_GATEWAY_MYSQL_USER):$(MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
+            - name: API_GATEWAY_REDIS_PASSWORD
+              value: "$(REDIS_PASSWORD)"
           resources:
             limits:
               memory: 512Mi
