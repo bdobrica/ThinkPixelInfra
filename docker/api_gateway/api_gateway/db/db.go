@@ -68,7 +68,7 @@ func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("database query error")
+		return 0, "", time.Time{}, 0, fmt.Errorf("database query error %v", err)
 	}
 
 	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
@@ -96,7 +96,7 @@ func GetAPIKeyDetailsByID(siteId int) (int, string, time.Time, int, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", time.Time{}, 0, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, errors.New("database query error")
+		return 0, "", time.Time{}, 0, fmt.Errorf("database query error %v", err)
 	}
 
 	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
@@ -176,13 +176,14 @@ func ActivateAPIKey(domain, path, apiKey string) error {
 		return fmt.Errorf("failed to parse API_GATEWAY_API_KEY_VALIDITY: %v", err)
 	}
 
+	hashedApiKey := utils.HashString(apiKey)
 	expiresAt := time.Now().Add(validity)
 	query := `
 		UPDATE wp_thinkpixel_sites
 		SET api_key = ?, status = 'active', updated_at = NOW(), verified_at = NOW(), expires_at = ?
 		WHERE domain = ? AND path = ? AND validation_status = 'verified'`
 
-	result, err := dbConn.Exec(query, apiKey, expiresAt, domain, path)
+	result, err := dbConn.Exec(query, hashedApiKey, expiresAt, domain, path)
 	if err != nil {
 		return fmt.Errorf("failed to activate API key: %v", err)
 	}
