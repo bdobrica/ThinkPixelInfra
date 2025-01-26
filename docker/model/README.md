@@ -10,8 +10,6 @@ The Embedding Model is a service that generates embeddings for a given input. It
 - `MODEL_ZMQ_CLIENT_ADDR`: ZMQ socket address where FastAPI threads are connecting to. Default: `ipc:///tmp/mpnetv2.client`
 - `MODEL_ZMQ_WORKER_ADDR`: ZMQ socket address where the Model Workers are connecting to. Default: `ipc:///tmp/mpnetv2.worker`
 - `MODEL_HTTP_PORT`: HTTP port for the model. Default: `8000`
-- `MODEL_TEXT_MAX_LENGTH`: Maximum length of text input. Default: `128`
-- `MODEL_TEXT_SPLIT_OVERLAP`: Overlap between text splits. Default: `20`
 - `MODEL_NUM_WORKERS`: Number of workers for the model. Default: cpu count / 2
 
 ## Weight Files

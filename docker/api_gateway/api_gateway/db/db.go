@@ -19,6 +19,16 @@ var (
 	initOnce   sync.Once
 )
 
+type APIKeyDetails struct {
+	ID               int
+	IndexingNode     string
+	ExpiresAt        time.Time
+	MaxSearchResults int
+	Model            string
+	ChunkSize        int
+	ChunkOverlap     int
+}
+
 // GetDBConnection provides a singleton instance of the database connection
 func GetDBConnection() (*sql.DB, error) {
 	var err error
@@ -47,42 +57,39 @@ func CloseDBConnection() error {
 }
 
 // GetAPIKeyDetails retrieves API key details from the database
-func GetAPIKeyDetails(hashedKey string) (int, string, time.Time, int, error) {
+func GetAPIKeyDetails(hashedKey string) (APIKeyDetails, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
-		return 0, "", time.Time{}, 0, err
+		return APIKeyDetails{}, err
 	}
 
 	query := `
-		SELECT id, indexing_node, expires_at, max_search_results
+		SELECT id, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
 		FROM wp_thinkpixel_sites
 		WHERE api_key = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
 	row := dbConn.QueryRow(query, hashedKey)
 
-	var id int
-	var indexingNode string
-	var expiresAt sql.NullTime
-	var maxSearchResults int
-	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
+	var keyDetails APIKeyDetails
+	if err := row.Scan(&keyDetails.ID, &keyDetails.IndexingNode, &keyDetails.ExpiresAt, &keyDetails.MaxSearchResults, &keyDetails.Model, &keyDetails.ChunkSize, &keyDetails.ChunkOverlap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("invalid API key")
+			return APIKeyDetails{}, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, fmt.Errorf("database query error %v", err)
+		return APIKeyDetails{}, fmt.Errorf("database query error %v", err)
 	}
 
-	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
+	return keyDetails, nil
 }
 
 // GetAPIKeyDetailsByID retrieves API key details from the database by API Key ID
-func GetAPIKeyDetailsByID(siteId int) (int, string, time.Time, int, error) {
+func GetAPIKeyDetailsByID(siteId int) (APIKeyDetails, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
-		return 0, "", time.Time{}, 0, err
+		return APIKeyDetails{}, err
 	}
 
 	query := `
-		SELECT id, indexing_node, expires_at
+		SELECT id, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
 		FROM wp_thinkpixel_sites
 		WHERE id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
@@ -92,14 +99,17 @@ func GetAPIKeyDetailsByID(siteId int) (int, string, time.Time, int, error) {
 	var indexingNode string
 	var expiresAt sql.NullTime
 	var maxSearchResults int
-	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults); err != nil {
+	var model string
+	var chunkSize int
+	var chunkOverlap int
+	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults, &model, &chunkSize, &chunkOverlap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, "", time.Time{}, 0, errors.New("invalid API key")
+			return APIKeyDetails{}, errors.New("invalid API key")
 		}
-		return 0, "", time.Time{}, 0, fmt.Errorf("database query error %v", err)
+		return APIKeyDetails{}, fmt.Errorf("database query error %v", err)
 	}
 
-	return id, indexingNode, expiresAt.Time, maxSearchResults, nil
+	return APIKeyDetails{}, nil
 }
 
 // StoreRegistrationData stores registration data in the database

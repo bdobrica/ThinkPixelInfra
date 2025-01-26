@@ -47,7 +47,7 @@ class InferenceResponse(BaseModel):
 
 
 class SuccessResponse(BaseModel):
-    status: str = "ok"
+    success: bool = True
     version: str = os.getenv("VERSION", "0.0.0")
 
 
@@ -139,7 +139,7 @@ async def ping() -> SuccessResponse:
 
     if ready:
         # If already successful, return immediately without additional requests
-        return SuccessResponse(status="ok")
+        return SuccessResponse()
 
     # Attempt to send ZMQ request until successful or timeout
     timeout = 1.0  # seconds
@@ -149,7 +149,7 @@ async def ping() -> SuccessResponse:
         success = await ping_zmq_request(timeout=timeout)
         if success:
             ready = True
-            return SuccessResponse(status="ok")
+            return SuccessResponse()
 
     # If unsuccessful within the timeout, return an error
     raise HTTPException(status_code=500, detail="Ping failed")

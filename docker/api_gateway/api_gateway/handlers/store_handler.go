@@ -57,7 +57,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	responseChan := make(chan []model.EmbeddingResponse, 1)
 	errChan := make(chan error, 1)
 	go func() {
-		response, err := model.GetEmbeddings(textItems)
+		response, err := model.GetEmbeddings(textItems, cacheEntry.Model, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
 		if err != nil {
 			errChan <- err
 			return

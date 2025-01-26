@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from functools import lru_cache
-from typing import Any, List
+from typing import Any
 
 import torch
 import zmq
@@ -16,8 +16,6 @@ from .config import (
     MODEL_DEVICE,
     MODEL_NUM_WORKERS,
     MODEL_PATH,
-    MODEL_TEXT_MAX_LENGTH,
-    MODEL_TEXT_SPLIT_OVERLAP,
     MODEL_ZMQ_WORKER_ADDR,
 )
 
@@ -35,17 +33,6 @@ def load_model():
     device = torch.device(MODEL_DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     model = AutoModel.from_pretrained(MODEL_PATH).to(device)
-
-
-def split_text(text: str, max_length: int, overlap: int) -> List[str]:
-    """Split text into smaller parts with overlap."""
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = min(start + max_length, len(text))
-        chunks.append(text[start:end])
-        start += max_length - overlap
-    return chunks
 
 
 def mean_pooling(
@@ -89,24 +76,12 @@ def process_task(context: zmq.Context):
                 "Received %s text items for inference.", len(text_items)
             )
 
-            # Prepare input data for batch processing
-            all_chunks = []
-            metadata_map = []
-            for item in text_items:
-                text = item["text"]
-                metadata = item["metadata"]
-
-                # Split text if necessary
-                chunks = split_text(
-                    text, MODEL_TEXT_MAX_LENGTH, MODEL_TEXT_SPLIT_OVERLAP
-                )
-                all_chunks.extend(chunks)
-                metadata_map.extend([metadata] * len(chunks))
+            text_batch = [item.get("text", "") for item in text_items]
 
             # Batch encode and process with the model
-            logger.debug("Processing %s chunks...", len(all_chunks))
+            logger.debug("Processing %s chunks...", len(text_batch))
             encoded_input = tokenizer(
-                all_chunks, padding=True, truncation=True, return_tensors="pt"
+                text_batch, padding=True, truncation=True, return_tensors="pt"
             ).to(device)
             with torch.no_grad():
                 model_output = model(**encoded_input)
@@ -130,9 +105,9 @@ def process_task(context: zmq.Context):
                 ).decode("utf-8")
                 results.append(
                     {
-                        "text": all_chunks[i],
+                        "text": text_items[i].get("text", ""),
                         "vector": encoded_vector,
-                        "metadata": metadata_map[i],
+                        "metadata": text_items[i].get("metadata", {}),
                     }
                 )
 

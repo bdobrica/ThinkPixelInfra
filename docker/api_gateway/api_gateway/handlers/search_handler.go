@@ -52,7 +52,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	embeddingChan := make(chan []model.EmbeddingResponse)
 	errChan := make(chan error)
 	go func() {
-		embeddings, err := model.GetEmbeddings([]model.TextItem{textItem})
+		embeddings, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, len(input.Text), 0)
 		if err != nil {
 			errChan <- err
 			return

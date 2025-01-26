@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"api_gateway/config"
+
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -47,5 +48,5 @@ func DecodeJWT(tokenString string) (string, error) {
 		hashedKey := claims["hashed_key"].(string)
 		return hashedKey, nil
 	}
-	return "", errors.New("Invalid token")
+	return "", errors.New("invalid token")
 }

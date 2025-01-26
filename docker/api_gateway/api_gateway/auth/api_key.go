@@ -15,6 +15,9 @@ type CacheEntry struct {
 	IndexingNode     string
 	ExpiresAt        time.Time
 	MaxSearchResults int
+	Model            string
+	ChunkSize        int
+	ChunkOverlap     int
 }
 
 // KeyCache stores valid API keys in-memory
@@ -44,17 +47,20 @@ func GetCachedAPIKeyData(hashedKey string) (CacheEntry, error) {
 	}
 
 	// Query the database if not in cache
-	id, indexingNode, expiresAt, maxSearchResults, err := db.GetAPIKeyDetails(hashedKey)
+	keyDetails, err := db.GetAPIKeyDetails(hashedKey)
 	if err != nil {
 		return CacheEntry{}, err
 	}
 
 	// Add the valid key to the cache
 	cacheEntry := CacheEntry{
-		ID:               id,
-		IndexingNode:     indexingNode,
-		ExpiresAt:        expiresAt,
-		MaxSearchResults: maxSearchResults,
+		ID:               keyDetails.ID,
+		IndexingNode:     keyDetails.IndexingNode,
+		ExpiresAt:        keyDetails.ExpiresAt,
+		MaxSearchResults: keyDetails.MaxSearchResults,
+		Model:            keyDetails.Model,
+		ChunkSize:        keyDetails.ChunkSize,
+		ChunkOverlap:     keyDetails.ChunkOverlap,
 	}
 	KeyCache.Lock.Lock()
 	KeyCache.Data[hashedKey] = cacheEntry
