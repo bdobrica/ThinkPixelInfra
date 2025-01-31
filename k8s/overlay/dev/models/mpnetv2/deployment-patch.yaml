@@ -1,31 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ml-model
-  labels:
-    app.kubernetes.io/component: ml-model
-    app.kubernetes.io/version: 0.1.0
+  name: mpnetv2
 spec:
-  replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ml-model
+      app.kubernetes.io/name: mpnetv2
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ml-model
+        app.kubernetes.io/name: mpnetv2
     spec:
       containers:
         - name: ml-model
           image: quay.io/bdobrica/thinkpixel-model-multi:0.1.6
-          ports:
-            - containerPort: 8000
           resources:
             limits:
               memory: 3Gi
             requests:
               cpu: 1000m
               memory: 3Gi
-      imagePullSecrets:
-        - name: quay-io-credentials
-

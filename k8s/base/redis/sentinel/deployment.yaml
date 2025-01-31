@@ -2,17 +2,20 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis-sentinel
+  labels:
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/version: 0.1.0
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis
-      role: sentinel
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: sentinel
   template:
     metadata:
       labels:
-        app: redis
-        role: sentinel
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/component: sentinel
     spec:
       volumes:
         - name: sentinel-config

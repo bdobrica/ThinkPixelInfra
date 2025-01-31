@@ -8,11 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"api_gateway/config"
 	"api_gateway/logger"
 )
-
-var ModelURL = config.GetEnv("API_GATEWAY_MODEL_URL", "http://model:8000/infer")
 
 type Metadata struct {
 	ID    int               `json:"id"`
@@ -46,61 +43,6 @@ type EmbeddingResponse struct {
 	Embedding string `json:"embedding"`
 }
 
-// splitText splits the Text field of the TextItem into chunks of length chunkSize
-// with chunkOverlap characters and returns a list of TextItems with updated metadata.
-func splitText(textItem TextItem, chunkSize, chunkOverlap int) []TextItem {
-	text := textItem.Text
-	var result []TextItem
-
-	// Ensure chunkSize is greater than chunkOverlap
-	if chunkSize <= chunkOverlap {
-		panic("chunkSize must be greater than chunkOverlap")
-	}
-
-	for start := 0; start < len(text); start += chunkSize - chunkOverlap {
-		end := start + chunkSize
-		if end > len(text) {
-			end = len(text)
-		}
-
-		chunk := text[start:end]
-
-		// Copy metadata and add Offset to the Extra field
-		metadata := textItem.Metadata
-		if metadata.Extra == nil {
-			metadata.Extra = make(map[string]string)
-		}
-		metadata.Extra["Offset"] = fmt.Sprintf("%d", start)
-
-		// Create a new TextItem for the chunk
-		result = append(result, TextItem{
-			Text:     chunk,
-			Metadata: metadata,
-		})
-
-		// Break if we've reached the end of the text
-		if end == len(text) {
-			break
-		}
-	}
-
-	return result
-}
-
-func splitTextItems(textItems []TextItem, chunkSize, chunkOverlap int) []TextItem {
-	var allChunks []TextItem
-
-	for _, item := range textItems {
-		// Split the current TextItem into chunks
-		chunks := splitText(item, chunkSize, chunkOverlap)
-
-		// Append the chunks to the result list
-		allChunks = append(allChunks, chunks...)
-	}
-
-	return allChunks
-}
-
 // GetEmbeddings retrieves embeddings for an array of text items
 func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -119,6 +61,7 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 		return nil, err
 	}
 
+	ModelURL := fmt.Sprintf("http://%s:8000/infer", model)
 	resp, err := client.Post(ModelURL, "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, err

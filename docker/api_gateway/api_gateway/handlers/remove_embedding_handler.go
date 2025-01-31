@@ -1,0 +1,78 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"api_gateway/auth"
+	"api_gateway/logger"
+	"api_gateway/middleware"
+	"api_gateway/redisconn"
+	"api_gateway/utils"
+)
+
+type RemoveEmbeddingRequest struct {
+	ID     string `json:"id"`
+	Offset int    `json:"offset"`
+}
+
+type RemoveMultipleEmbeddingsByOffsetRequest struct {
+	ID      string `json:"id"`
+	Offsets []int  `json:"offsets"`
+}
+
+func RemoveEmbeddingByOffsetHandler(w http.ResponseWriter, r *http.Request) {
+	// Retrieve CacheEntry from context
+	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	if !ok {
+		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
+		return
+	}
+	logger.Debugf("CacheEntry %+v", cacheEntry)
+
+	// Parse input
+	var req RemoveEmbeddingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	err := redisconn.RemoveEmbeddingByOffset(cacheEntry.ID, cacheEntry.IndexingNode, req.ID, req.Offset)
+	if err != nil {
+		logger.Errorf("Error removing embedding: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to remove embedding")
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Embedding removed successfully"))
+}
+
+func RemoveMultipleEmbeddingsByOffsetHandler(w http.ResponseWriter, r *http.Request) {
+	// Retrieve CacheEntry from context
+	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	if !ok {
+		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
+		return
+	}
+	logger.Debugf("CacheEntry %+v", cacheEntry)
+
+	// Parse input
+	var req RemoveMultipleEmbeddingsByOffsetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	for _, offset := range req.Offsets {
+		err := redisconn.RemoveEmbeddingByOffset(cacheEntry.ID, cacheEntry.IndexingNode, req.ID, offset)
+		if err != nil {
+			logger.Errorf("Error removing embedding for ID %s and offset %d: %v", req.ID, offset, err)
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to remove embedding")
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Embeddings removed successfully"))
+}

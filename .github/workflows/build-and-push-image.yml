@@ -34,7 +34,7 @@ jobs:
           
           echo "Comparing changes in range: $commit_range"
           git diff --name-only $commit_range > changed_files.txt
-          grep -E '^docker/.*/\.bumpversion\.cfg$' changed_files.txt > changed_cfgs.txt || true
+          grep -E '^docker(/[^/]+){1,2}/\.bumpversion\.cfg$' changed_files.txt > changed_cfgs.txt || true
           cat changed_cfgs.txt
 
       - name: Skip Build if No Changes

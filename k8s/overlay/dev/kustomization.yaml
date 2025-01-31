@@ -2,9 +2,9 @@ resources:
   - ../../base/namespace
   - ../../base/secrets
   - ../../base/mysql
-  - ../../base/ml-model
   - ../../base/api-gateway
   - ./redis
+  - ./models
 
 namespace: thinkpixel
 

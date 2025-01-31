@@ -2,15 +2,18 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: wordpress
+  labels:
+    app.kubernetes.io/component: wordpress
+    app.kubernetes.io/version: 0.1.0
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: wordpress
+      app.kubernetes.io/name: wordpress
   template:
     metadata:
       labels:
-        app: wordpress
+        app.kubernetes.io/name: wordpress
     spec:
       containers:
         - name: wordpress

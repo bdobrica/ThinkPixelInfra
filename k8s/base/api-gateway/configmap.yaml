@@ -2,9 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: api-gateway-config
+  labels:
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/version: 0.1.0
 data:
   API_GATEWAY_JWT_SECRET: supersecret
-  API_GATEWAY_MODEL_URL: http://ml-model:8000/infer
   API_GATEWAY_MYSQL_HOST: mysql
   API_GATEWAY_MYSQL_PORT: "3306"
   API_GATEWAY_MYSQL_USER: thinkpixel

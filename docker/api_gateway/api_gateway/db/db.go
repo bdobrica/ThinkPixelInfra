@@ -326,3 +326,24 @@ func ResetValidationStatus(domain, path, newToken string, newTokenExpiresAt time
 
 	return nil
 }
+
+// UpdateAPIKeyBySiteID updates the API key for a given site ID
+func UpdateAPIKeyBySiteID(siteId int, newApiKey string) error {
+	dbConn, err := GetDBConnection()
+	if err != nil {
+		return err
+	}
+
+	hashedApiKey := utils.HashString(newApiKey)
+	query := `
+		UPDATE wp_thinkpixel_sites
+		SET api_key = ?, updated_at = NOW()
+		WHERE id = ?`
+
+	_, err = dbConn.Exec(query, hashedApiKey, siteId)
+	if err != nil {
+		return fmt.Errorf("failed to update API key: %v", err)
+	}
+
+	return nil
+}
