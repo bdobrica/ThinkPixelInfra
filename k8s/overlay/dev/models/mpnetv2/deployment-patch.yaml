@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: ml-model
-          image: quay.io/bdobrica/thinkpixel-model-multi:0.1.6
+          image: quay.io/bdobrica/thinkpixel-mpnetv2-multi:0.1.6
           resources:
             limits:
               memory: 3Gi
