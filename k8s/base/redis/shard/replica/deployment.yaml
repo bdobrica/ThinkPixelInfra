@@ -26,16 +26,14 @@ spec:
             requests:
               memory: 2Gi
               cpu: 250m
+          envFrom:
+            - secretRef:
+                name: redis-secret
           env:
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: redis-password
           ports:
             - containerPort: 6379
           volumeMounts:
