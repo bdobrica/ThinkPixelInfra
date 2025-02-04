@@ -284,7 +284,7 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 	ctx := context.Background()
 	results := []map[string]interface{}{}
 	indexName := fmt.Sprintf("index:%d", siteId)
-	logger.Debugf("Searching embeddings in index %s", indexName)
+	logger.Debugf("Searching embeddings in index %s for %d items", indexName, limit)
 
 	client, err := getRedisClient(indexingNode)
 	if err != nil {
@@ -304,7 +304,8 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 			fmt.Sprintf("*=>[KNN %d @embedding $query_vec AS score]", limit),
 			"PARAMS", "2", "query_vec", embeddingBytes,
 			"SORTBY", "score",
-			"DIALECT", "2")
+			"DIALECT", "2",
+			"LIMIT", "0", strconv.Itoa(limit)) // Add LIMIT clause
 
 		searchResults, err := cmd.Result()
 		if err != nil {
