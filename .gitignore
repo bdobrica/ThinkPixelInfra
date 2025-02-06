@@ -30,6 +30,7 @@ weights
 # Ignore the secrets file
 .secrets.hcl
 *.key
+secret.yaml
 *-secret.yaml
 !sealed-secret.yaml
 !*-sealed-secret.yaml
