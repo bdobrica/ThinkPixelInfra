@@ -15,6 +15,11 @@ The API Gateway is a RESTful API that serves as an entry point to the system. It
 - `API_GATEWAY_VALIDATION_SUFFIX`: The suffix appended to `<domain><path>` to call for validation of registration request. Default: `wp-content/plugins/thinkpixel/rpc/validate/`
 - `API_GATEWAY_VALIDATION_TIMEOUT`: Timeout for validation request, as interval. Default: `5s`
 - `API_GATEWAY_VALIDATION_MAX_ATTEMPTS`: Number of retries for validation attempts. Default: `3`
+- `API_GATEWAY_LOG_FILE_PATH`: Log file path for requests. Default: `/var/log/requests.jsonl`
+- `API_GATEWAY_LOG_MAX_SIZE`: Maximum log file size, in bytes. Default: `10485760` (10MB)
+- `API_GATEWAY_LOG_MAX_FILES`: Maximum number of log files. Default: `5`
+- `API_GATEWAY_LOG_BUFFER_SIZE`: Log level. Default: `100`
+- `API_GATEWAY_LOG_FLUSH_INTERVAL`: Log flush interval, in seconds. Default: `60`
 
 
 ## API Flows
@@ -268,11 +273,11 @@ Response:
 
 Step 1: Getting `<validation_token>` request:
 ```sh
-curl -X POST http://api-gateway:8080/register \
+curl -X POST https://api.thinkpixel.io:8080/register \
 -H "Content-Type: application/json" \
 -d '{
-  "domain": "example.com",
-  "path": "/shop/",
+  "domain": "ublo.ro",
+  "path": "/",
   "estimated_pages": 415,
   "average_page_size": 1478,
   "st_dev_page_size": 4891

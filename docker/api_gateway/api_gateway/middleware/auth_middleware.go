@@ -24,9 +24,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Remove "Bearer " prefix if present
-		if strings.HasPrefix(tokenString, "Bearer ") {
-			tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-		}
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 
 		// Validate the JWT and extract claims
 		_, err := auth.ValidateJWT(tokenString)
