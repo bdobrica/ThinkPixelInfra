@@ -9,6 +9,14 @@ resources:
 namespace: thinkpixel
 
 patches:
+  - path: patches/api-gateway-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: api-gateway-secret
+  - path: patches/fluent-bit-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: fluent-bit-secret
   - path: patches/redis-sealed-secret.yaml
     target:
       kind: SealedSecret

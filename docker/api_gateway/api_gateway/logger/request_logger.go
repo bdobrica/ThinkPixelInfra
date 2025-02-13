@@ -26,12 +26,13 @@ type RequestLog struct {
 
 // RequestLogger implements asynchronous, buffered logging with rotation and periodic flush.
 type RequestLogger struct {
-	filePath      string        // full path to the active log file (e.g. /logs/requests.jsonl)
+	fileTemplate  string        // template for log file name e.g. "/var/log/api-gateway/requests-%s.jsonl"
 	maxSize       int64         // maximum size in bytes before rotation
 	maxFiles      int           // maximum number of rotated files to keep
 	flushInterval time.Duration // flush the buffer every flushInterval if not empty
 
 	mu          sync.Mutex
+	currentFile string        // current active file name (populated from fileTemplate)
 	file        *os.File
 	writer      *bufio.Writer
 	currentSize int64
@@ -41,32 +42,26 @@ type RequestLogger struct {
 	wg     sync.WaitGroup
 }
 
-// NewLogger creates a new RequestLogger.
-// bufferSize determines how many log entries can be queued before writes block.
-// flushInterval defines how often the logger should flush its buffer.
-func NewLogger(filePath string, maxSize int64, maxFiles, bufferSize int, flushInterval time.Duration) (*RequestLogger, error) {
-	logger := &RequestLogger{
-		filePath:      filePath,
-		maxSize:       maxSize,
-		maxFiles:      maxFiles,
-		flushInterval: flushInterval,
-		logCh:         make(chan RequestLog, bufferSize),
-		doneCh:        make(chan struct{}),
-	}
-
-	if err := logger.openFile(); err != nil {
-		return nil, err
-	}
-
-	logger.wg.Add(1)
-	go logger.run()
-
-	return logger, nil
+// newFileName generates a new log filename by applying the current timestamp
+// to the fileTemplate. The timestamp format used is "20060102150405".
+func (logger *RequestLogger) newFileName() string {
+	timestamp := time.Now().Format("20060102150405")
+	return fmt.Sprintf(logger.fileTemplate, timestamp)
 }
 
-// openFile opens (or creates) the active log file and prepares the buffered writer.
+// openFile opens (or creates) the active log file using the file template and prepares the buffered writer.
+// It also ensures that the directory for the log file exists.
 func (logger *RequestLogger) openFile() error {
-	file, err := os.OpenFile(logger.filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	logger.currentFile = logger.newFileName()
+	// Ensure the directory exists
+	dir := filepath.Dir(logger.currentFile)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	file, err := os.OpenFile(logger.currentFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -82,7 +77,7 @@ func (logger *RequestLogger) openFile() error {
 }
 
 // rotateIfNeeded checks if adding n bytes would exceed the max file size,
-// and if so rotates the file.
+// and if so rotates the file by closing the current file and opening a new one.
 func (logger *RequestLogger) rotateIfNeeded(n int) error {
 	logger.mu.Lock()
 	defer logger.mu.Unlock()
@@ -100,21 +95,7 @@ func (logger *RequestLogger) rotateIfNeeded(n int) error {
 		return err
 	}
 
-	// Rename the current file by appending a timestamp.
-	timestamp := time.Now().Format("20060102150405")
-	ext := filepath.Ext(logger.filePath)                       // e.g. ".jsonl"
-	base := logger.filePath[0 : len(logger.filePath)-len(ext)] // remove extension
-	newName := fmt.Sprintf("%s-%s%s", base, timestamp, ext)
-	if err := os.Rename(logger.filePath, newName); err != nil {
-		return err
-	}
-
-	// Clean up older rotated files if needed.
-	if err := logger.cleanupOldFiles(); err != nil {
-		return err
-	}
-
-	// Open a new file
+	// Open a new file (which will have a new timestamp)
 	if err := logger.openFile(); err != nil {
 		return err
 	}
@@ -123,14 +104,9 @@ func (logger *RequestLogger) rotateIfNeeded(n int) error {
 
 // cleanupOldFiles removes the oldest rotated files if more than maxFiles exist.
 func (logger *RequestLogger) cleanupOldFiles() error {
-	dir := filepath.Dir(logger.filePath)
-	ext := filepath.Ext(logger.filePath)
-	base := filepath.Base(logger.filePath)
-	base = base[0 : len(base)-len(ext)]
-
-	// Look for rotated files that match the pattern e.g. "requests-<timestamp>.jsonl"
-	pattern := fmt.Sprintf("%s-%s%s", base, "*", ext)
-	matches, err := filepath.Glob(filepath.Join(dir, pattern))
+	// Build the glob pattern by replacing "%s" with "*"
+	pattern := fmt.Sprintf(logger.fileTemplate, "*")
+	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return err
 	}
@@ -204,6 +180,10 @@ func (logger *RequestLogger) writeEntry(entry RequestLog) {
 	_, _ = logger.writer.WriteString(line)
 	logger.currentSize += int64(n)
 	logger.mu.Unlock()
+
+	// Optionally, clean up rotated files.
+	// This could be done periodically instead of on every write.
+	_ = logger.cleanupOldFiles()
 }
 
 // LogRequest queues a request for logging. If the queue is full, the log entry is dropped.
@@ -233,13 +213,38 @@ func (logger *RequestLogger) Shutdown() {
 	logger.wg.Wait()
 }
 
+// NewLogger creates a new RequestLogger.
+// bufferSize determines how many log entries can be queued before writes block.
+// flushInterval defines how often the logger should flush its buffer.
+func NewLogger(fileTemplate string, maxSize int64, maxFiles, bufferSize int, flushInterval time.Duration) (*RequestLogger, error) {
+	logger := &RequestLogger{
+		fileTemplate:  fileTemplate,
+		maxSize:       maxSize,
+		maxFiles:      maxFiles,
+		flushInterval: flushInterval,
+		logCh:         make(chan RequestLog, bufferSize),
+		doneCh:        make(chan struct{}),
+	}
+
+	if err := logger.openFile(); err != nil {
+		return nil, err
+	}
+
+	logger.wg.Add(1)
+	go logger.run()
+
+	return logger, nil
+}
+
 var RLogger *RequestLogger
 
 func init() {
-	logPath := config.GetEnv("API_GATEWAY_LOG_FILE_PATH", "/var/log/requests.jsonl")
-	maxSizeStr := config.GetEnv("API_GATEWAY_LOG_MAX_SIZE", "10485760")       // default 10 MB
-	maxFilesStr := config.GetEnv("API_GATEWAY_LOG_MAX_FILES", "5")            // default 5
-	bufferSizeStr := config.GetEnv("API_GATEWAY_LOG_BUFFER_SIZE", "100")      // default 100
+	// Read configuration from environment variables
+	// API_GATEWAY_LOG_FILE_PATH is now a template, e.g. "/var/log/requests-%s.jsonl"
+	fileTemplate := config.GetEnv("API_GATEWAY_LOG_FILE_PATH", "/var/log/api-gateway/requests-%s.jsonl")
+	maxSizeStr := config.GetEnv("API_GATEWAY_LOG_MAX_SIZE", "10485760")   // default 10 MB
+	maxFilesStr := config.GetEnv("API_GATEWAY_LOG_MAX_FILES", "5")        // default 5
+	bufferSizeStr := config.GetEnv("API_GATEWAY_LOG_BUFFER_SIZE", "100")    // default 100
 	flushIntervalStr := config.GetEnv("API_GATEWAY_LOG_FLUSH_INTERVAL", "60") // default 60 seconds
 
 	var (
@@ -262,9 +267,9 @@ func init() {
 		flushIntervalSec = v
 	}
 
-	// Create the logger.
+	// Create the logger using the file template.
 	var err error
-	RLogger, err = NewLogger(logPath, maxSize, maxFiles, bufferSize, time.Duration(flushIntervalSec)*time.Second)
+	RLogger, err = NewLogger(fileTemplate, maxSize, maxFiles, bufferSize, time.Duration(flushIntervalSec)*time.Second)
 	if err != nil {
 		// Errorf is assumed to be a helper that logs errors.
 		Errorf("Failed to create request logger: %v", err)

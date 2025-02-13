@@ -15,9 +15,15 @@ spec:
       labels:
         app.kubernetes.io/name: api-gateway
     spec:
+      volumes:
+        - name: request-logs
+          emptyDir: {}
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.2.0
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.2.1
           ports:
             - containerPort: 8080
           envFrom:
@@ -40,6 +46,44 @@ spec:
             requests:
               cpu: 100m
               memory: 512Mi
+          volumeMounts:
+            - name: request-logs
+              mountPath: /var/log/api-gateway
+        - name: fluentbit
+          image: fluent/fluent-bit:3.2.6
+          ports:
+            - containerPort: 2020
+          envFrom:
+            - secretRef:
+                name: fluent-bit-secret
+          env:
+            - name: FLUENT_BIT_S3_BUCKET
+              value: dev-thinkpixel-request-logs
+            - name: FLUENT_BIT_S3_ENDPOINT
+              value: https://fsn1.your-objectstorage.com
+            - name: FLUENT_BIT_CLUSTER_NAME
+              value: dev.thinkpixel.io
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 256Mi
+          args:
+            - "-c"
+            - "/fluent-bit/etc/fluent-bit.conf"
+          volumeMounts:
+            - name: request-logs
+              mountPath: /var/log/api-gateway
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc
       imagePullSecrets:
         - name: quay-io-credentials
-

@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,3 +15,18 @@ spec:
   selector:
     app.kubernetes.io/name: api-gateway
   type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit-metrics
+  labels:
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/version: 0.1.0
+spec:
+  ports:
+    - port: 2020
+      targetPort: 2020
+  selector:
+    app.kubernetes.io/name: api-gateway
+  type: ClusterIP

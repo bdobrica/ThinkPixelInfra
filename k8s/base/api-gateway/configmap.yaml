@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,6 +15,60 @@ data:
   API_GATEWAY_VALIDATION_SUFFIX: "?rest_route=/thinkpixel/v1/validate/"
   API_GATEWAY_VALIDATION_TIMEOUT: 5s
   API_GATEWAY_VALIDATION_MAX_ATTEMPTS: "3"
+  API_GATEWAY_LOG_FILE_PATH: /var/log/api-gateway/requests-%s.jsonl
+  API_GATEWAY_LOG_MAX_FILES: "50"
   LOCAL: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  labels:
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/version: 0.1.0
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        60
+        Log_Level    info
+        Parsers_File parsers.conf
+        HTTP_Server  On
+        HTTP_Listen  0.0.0.0
+        HTTP_PORT    2020
+        storage.metrics on
+        storage.sync full
 
+    [INPUT]
+        Name        tail
+        Path        /var/log/api-gateway/requests-*.jsonl
+        Parser      json
+        Tag         api-gateway.*
+        Refresh_Interval 60
+        Read_from_Head true
+        Mem_Buf_Limit 50MB
+
+    [FILTER]
+        Name                kubernetes
+        Match               api-gateway.*
+        Merge_Log           On
+        Merge_Log_Key       log_processed
+        Kube_Tag_Prefix     api-gateway.
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+
+    [OUTPUT]
+        name        s3
+        match       *
+        bucket      ${FLUENT_BIT_S3_BUCKET}
+        endpoint    ${FLUENT_BIT_S3_ENDPOINT}
+        total_file_size 10M
+        upload_timeout 60s
+        store_dir   /tmp/fluent-bit/s3
+        s3_key_format /logs/${FLUENT_BIT_CLUSTER_NAME}/${POD_NAME}/%Y-%m-%d/%H/requests.jsonl
+  parsers.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y%m%d%H%M%S
 

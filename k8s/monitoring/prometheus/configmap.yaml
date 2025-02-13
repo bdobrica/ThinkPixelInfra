@@ -86,3 +86,8 @@ data:
           - source_labels: [__meta_kubernetes_service_name]
             action: replace
             target_label: service
+      - job_name: 'fluent-bit'
+        metrics_path: /api/v2/metrics
+        static_configs:
+          - targets: ['fluent-bit-metrics:2020']
+
