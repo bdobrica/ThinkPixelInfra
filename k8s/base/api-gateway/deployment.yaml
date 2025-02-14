@@ -18,12 +18,14 @@ spec:
       volumes:
         - name: request-logs
           emptyDir: {}
+        - name: fluent-bit-storage
+          emptyDir: {}
         - name: fluent-bit-config
           configMap:
             name: fluent-bit-config
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.2.1
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.2.2
           ports:
             - containerPort: 8080
           envFrom:
@@ -85,5 +87,7 @@ spec:
               mountPath: /var/log/api-gateway
             - name: fluent-bit-config
               mountPath: /fluent-bit/etc
+            - name: fluent-bit-storage
+              mountPath: /tmp/fluent-bit
       imagePullSecrets:
         - name: quay-io-credentials

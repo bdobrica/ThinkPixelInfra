@@ -2,8 +2,10 @@ package logger
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,6 +24,7 @@ type RequestLog struct {
 	URL        string              `json:"url"`
 	Headers    map[string][]string `json:"headers"`
 	RemoteAddr string              `json:"remote_addr"`
+	Body       string              `json:"body"`
 }
 
 // RequestLogger implements asynchronous, buffered logging with rotation and periodic flush.
@@ -32,7 +35,7 @@ type RequestLogger struct {
 	flushInterval time.Duration // flush the buffer every flushInterval if not empty
 
 	mu          sync.Mutex
-	currentFile string        // current active file name (populated from fileTemplate)
+	currentFile string // current active file name (populated from fileTemplate)
 	file        *os.File
 	writer      *bufio.Writer
 	currentSize int64
@@ -190,14 +193,32 @@ func (logger *RequestLogger) writeEntry(entry RequestLog) {
 func (logger *RequestLogger) LogRequest(r *http.Request) {
 	headers := make(map[string][]string, len(r.Header))
 	for k, v := range r.Header {
+		// Skip Authorization header
+		if k == "Authorization" {
+			continue
+		}
 		headers[k] = v
 	}
+
+	// Read the request body and store it as a string.
+	var bodyStr string
+	if r.Body != nil {
+		// Read the request body.
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err == nil {
+			bodyStr = string(bodyBytes)
+		}
+		// Reset the request body so the handler can read it.
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+
 	entry := RequestLog{
 		Timestamp:  time.Now(),
 		Method:     r.Method,
 		URL:        r.URL.String(),
 		Headers:    headers,
 		RemoteAddr: r.RemoteAddr,
+		Body:       bodyStr,
 	}
 	select {
 	case logger.logCh <- entry:
@@ -242,9 +263,9 @@ func init() {
 	// Read configuration from environment variables
 	// API_GATEWAY_LOG_FILE_PATH is now a template, e.g. "/var/log/requests-%s.jsonl"
 	fileTemplate := config.GetEnv("API_GATEWAY_LOG_FILE_PATH", "/var/log/api-gateway/requests-%s.jsonl")
-	maxSizeStr := config.GetEnv("API_GATEWAY_LOG_MAX_SIZE", "10485760")   // default 10 MB
-	maxFilesStr := config.GetEnv("API_GATEWAY_LOG_MAX_FILES", "5")        // default 5
-	bufferSizeStr := config.GetEnv("API_GATEWAY_LOG_BUFFER_SIZE", "100")    // default 100
+	maxSizeStr := config.GetEnv("API_GATEWAY_LOG_MAX_SIZE", "10485760")       // default 10 MB
+	maxFilesStr := config.GetEnv("API_GATEWAY_LOG_MAX_FILES", "5")            // default 5
+	bufferSizeStr := config.GetEnv("API_GATEWAY_LOG_BUFFER_SIZE", "100")      // default 100
 	flushIntervalStr := config.GetEnv("API_GATEWAY_LOG_FLUSH_INTERVAL", "60") // default 60 seconds
 
 	var (

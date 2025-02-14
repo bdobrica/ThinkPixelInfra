@@ -37,6 +37,7 @@ data:
         HTTP_PORT    2020
         storage.metrics on
         storage.sync full
+        storage.path /tmp/fluent-bit
 
     [INPUT]
         Name        tail
@@ -46,6 +47,7 @@ data:
         Refresh_Interval 60
         Read_from_Head true
         Mem_Buf_Limit 50MB
+        storage.type filesystem
 
     [FILTER]
         Name                kubernetes
@@ -62,7 +64,7 @@ data:
         bucket      ${FLUENT_BIT_S3_BUCKET}
         endpoint    ${FLUENT_BIT_S3_ENDPOINT}
         total_file_size 10M
-        upload_timeout 60s
+        upload_timeout 10m
         store_dir   /tmp/fluent-bit/s3
         s3_key_format /logs/${FLUENT_BIT_CLUSTER_NAME}/${POD_NAME}/%Y-%m-%d/%H/requests.jsonl
   parsers.conf: |
