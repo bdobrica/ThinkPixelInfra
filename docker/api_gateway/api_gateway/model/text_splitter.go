@@ -8,6 +8,7 @@ import (
 
 func addOffsetToMetadata(metadata Metadata, offset int) Metadata {
 	newMetadata := Metadata{
+		ID:    metadata.ID,
 		Extra: make(map[string]string),
 	}
 	for k, v := range metadata.Extra {
