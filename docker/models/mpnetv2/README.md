@@ -39,10 +39,39 @@ ab7a97ce0e5d   sleepy_maxwell   0.22%     1.744GiB / 15.54GiB   11.22%    4.07kB
 
 ## Example
 
+Example request:
 ```bash
 curl \
-    -X POST "http://localhost:8000/infer" \
+    -X POST "http://mpnetv2:8000/infer" \
     -H "Content-Type: application/json" \
     -d '{"text_items": [{"text": "This is a very long piece of text ...", "metadata": {"id": 1, "extra": {"key": "value"}}}]}' \
 | jq
 ```
+
+Example response:
+```json
+{
+  "results": [
+    {
+      "text": "This is a very long piece of text ...",
+      "vector": "<base 64 encoded np.float32 array>",
+      "metadata": {
+        "id": 1,
+        "extra": {
+          "key": "value"
+        }
+      }
+    }
+  ],
+  "latency": 0.05925534199923277
+}
+```
+
+Notes:
+- The `results` field is a list of output text items;
+- The `text` field is the input text item;
+- The `vector` field is a base64 encoded numpy array of type `np.float32`;
+- The `metadata` field is optional and can be used to store additional information about the input text item. It is passed through to the output unchanged;
+    - The `id` field is an integer identifier for the input text item;
+    - The `extra` field is an optional dictionary of additional metadata;
+- The `latency` field is the time taken to process the request in seconds.

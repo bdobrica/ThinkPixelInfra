@@ -58,22 +58,28 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 
 	requestBody, err := json.Marshal(requestPayload)
 	if err != nil {
+		logger.Errorf("Error marshalling request payload: %v", err)
 		return nil, err
 	}
 
 	ModelURL := fmt.Sprintf("http://%s:8000/infer", model)
 	resp, err := client.Post(ModelURL, "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
+		// Log request details and error
+		logger.Errorf("Calling model %s with payload %s resulted in error: %v", model, requestBody, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// Log request details and status code
+		logger.Errorf("Model %s API returned status %d for request %s", model, resp.StatusCode, requestBody)
 		return nil, fmt.Errorf("model API returned status %d", resp.StatusCode)
 	}
 
 	var inferenceResponse InferenceResponse
 	if err := json.NewDecoder(resp.Body).Decode(&inferenceResponse); err != nil {
+		logger.Errorf("Error decoding response for request %s to model %s: %v", requestBody, model, err)
 		return nil, err
 	}
 

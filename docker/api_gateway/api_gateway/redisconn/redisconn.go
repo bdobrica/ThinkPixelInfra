@@ -321,7 +321,9 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 
 		// Process results
 		for i := 1; i < len(resultsArray); i++ {
-			logger.Debugf("Processing search result %d", i)
+			if i%10 == 0 { // Log every 10 results
+				logger.Debugf("Processing search result %d", i)
+			}
 			doc, ok := resultsArray[i].([]interface{})
 			if !ok {
 				continue

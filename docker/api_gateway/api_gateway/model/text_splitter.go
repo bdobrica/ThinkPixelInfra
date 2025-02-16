@@ -7,11 +7,14 @@ import (
 )
 
 func addOffsetToMetadata(metadata Metadata, offset int) Metadata {
-	if metadata.Extra == nil {
-		metadata.Extra = make(map[string]string)
+	newMetadata := Metadata{
+		Extra: make(map[string]string),
 	}
-	metadata.Extra["Offset"] = strconv.Itoa(offset)
-	return metadata
+	for k, v := range metadata.Extra {
+		newMetadata.Extra[k] = v
+	}
+	newMetadata.Extra["Offset"] = strconv.Itoa(offset)
+	return newMetadata
 }
 
 // splitText function splits a given text into chunks based on chunkSize and chunkOverlap
