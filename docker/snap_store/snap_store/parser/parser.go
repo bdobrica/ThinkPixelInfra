@@ -83,15 +83,29 @@ func ParseLogs(ctx context.Context, bc *bucket.BucketClient, prefix string) ([]P
 			var docsFromFile []ParsedDocument
 			for scanner.Scan() {
 				var entry LogEntry
-				if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+				readBytes := scanner.Bytes()
+				if len(readBytes) == 0 {
+					logger.Infof("Empty line in log entry; skipping")
+					continue
+				}
+
+				if err := json.Unmarshal(readBytes, &entry); err != nil {
 					logger.Errorf("Error unmarshaling log entry from %s: %v", objectInfo.Key, err)
 					continue
 				}
+
+				// Check if the body is empty
+				if entry.Body == "" {
+					logger.Debugf("Empty body in log entry from %s; skipping", objectInfo.Key)
+					continue
+				}
+
 				var docs []Document
 				if err := json.Unmarshal([]byte(entry.Body), &docs); err != nil {
 					logger.Errorf("Error unmarshaling body field from %s: %v", objectInfo.Key, err)
 					continue
 				}
+
 				// Transform each Document into a ParsedDocument that also holds the Timestamp.
 				for _, doc := range docs {
 					parsed := ParsedDocument{

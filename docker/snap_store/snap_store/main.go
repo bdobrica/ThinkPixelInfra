@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"strings"
 	"time"
@@ -15,8 +16,23 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Initialize BucketClient
+	// Define a flag for the date and time
+	dateTimeStr := flag.String("datetime", "", "The date and time in RFC3339 format (e.g., 2023-10-01T15:04:05Z)")
+	flag.Parse()
 
+	// Parse the date and time if provided
+	var now time.Time
+	var err error
+	if *dateTimeStr != "" {
+		now, err = time.Parse(time.RFC3339, *dateTimeStr)
+		if err != nil {
+			logger.Fatalf("Error parsing date and time: %v", err)
+		}
+	} else {
+		now = time.Now().UTC()
+	}
+
+	// Initialize BucketClient
 	endpoint := config.GetEnv("SNAP_STORE_S3_ENDPOINT_URL", "fsn1.your-objectstorage.com")
 	accessKeyID := config.GetEnv("SNAP_STORE_S3_ACCESS_KEY_ID", "")
 	secretAccessKey := config.GetEnv("SNAP_STORE_S3_SECRET_ACCESS_KEY", "")
@@ -31,7 +47,6 @@ func main() {
 	}
 
 	// Determine the previous hour (UTC)
-	now := time.Now().UTC()
 	prevHourTime := now.Add(-1 * time.Hour)
 	dateStr := prevHourTime.Format("2006-01-02")
 	hourStr := prevHourTime.Format("15")
