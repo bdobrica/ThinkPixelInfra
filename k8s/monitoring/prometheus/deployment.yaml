@@ -38,6 +38,8 @@ spec:
         volumeMounts:
           - name: config-volume
             mountPath: /etc/prometheus
+          - name: secrets
+            mountPath: /etc/prometheus/secrets
           - name: data-volume
             mountPath: /prometheus
       volumes:
@@ -47,6 +49,9 @@ spec:
             items:
               - key: prometheus.yml
                 path: prometheus.yml
+        - name: secrets
+          secret:
+            secretName: prometheus-secret
         - name: data-volume
           persistentVolumeClaim:
             claimName: prometheus-pvc

@@ -1,0 +1,8 @@
+resources:
+  - ../../../base/qdrant
+
+patches:
+  - path: stateful-set-patch.yaml
+    target:
+      kind: StatefulSet
+      name: qdrant

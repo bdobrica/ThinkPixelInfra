@@ -1,0 +1,6 @@
+resources:
+  - configmap.yaml
+  - sealed-secret.yaml
+  - service-account.yaml
+  - service.yaml
+  - stateful-set.yaml
