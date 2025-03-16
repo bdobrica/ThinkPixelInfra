@@ -5,6 +5,7 @@ resources:
   - ../../base/api-gateway
   - ./redis
   - ./models
+  - ./qdrant
 
 namespace: thinkpixel
 
@@ -29,3 +30,7 @@ patches:
     target:
       kind: SealedSecret
       name: quay-io-secret
+  - path: patches/qdrant-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: qdrant-secret
