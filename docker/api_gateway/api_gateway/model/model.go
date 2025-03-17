@@ -1,14 +1,13 @@
 package model
 
 import (
+	"api_gateway/logger"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
+	"sync"
 	"time"
-
-	"api_gateway/logger"
 )
 
 type Metadata struct {
@@ -21,39 +20,58 @@ type TextItem struct {
 	Metadata Metadata `json:"metadata"`
 }
 
-type InferenceRequest struct {
+type EmbeddingRequest struct {
 	TextItems []TextItem `json:"text_items"`
 }
 
-type EmbeddingsItem struct {
+type DenseItem struct {
 	Text     string   `json:"text"`
 	Vector   string   `json:"vector"`
 	Metadata Metadata `json:"metadata"`
 }
 
-type InferenceResponse struct {
-	Results []EmbeddingsItem `json:"results"`
-	Latency float64          `json:"latency"`
+type DenseResponse struct {
+	Results []DenseItem `json:"results"`
+	Latency float64     `json:"latency"`
+}
+
+type SparseItem struct {
+	Text     string   `json:"text"`
+	Values   string   `json:"values"`
+	Indices  string   `json:"indices"`
+	Metadata Metadata `json:"metadata"`
+}
+
+type SparseResponse struct {
+	Results []SparseItem `json:"results"`
+	Latency float64      `json:"latency"`
+}
+
+type DenseEmbedding struct {
+	Values []float32 `json:"values"`
+}
+
+type SparseEmbedding struct {
+	Values  []float32 `json:"values"`
+	Indices []int     `json:"indices"`
 }
 
 type EmbeddingResponse struct {
-	ID        int    `json:"id"`
-	Text      string `json:"text"`
-	Offset    int    `json:"offset"`
-	Embedding string `json:"embedding"`
+	ID              int             `json:"id"`
+	Text            string          `json:"text"`
+	Offset          int             `json:"offset"`
+	DenseEmbedding  DenseEmbedding  `json:"dense_embedding"`
+	SparseEmbedding SparseEmbedding `json:"sparse_embedding"`
 }
 
 // GetEmbeddings retrieves embeddings for an array of text items
-func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
+func callEmbeddingsModel[TResponse interface{ DenseResponse | SparseResponse }](textItems []TextItem, model string) (*TResponse, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	logger.Debugf("Using model %s", model)
-	logger.Debugf("Splitting text items into chunks of size %d with overlap %d", chunkSize, chunkOverlap)
 
-	splitTextItems := splitTextItems(textItems, chunkSize, chunkOverlap)
-
-	requestPayload := InferenceRequest{
-		TextItems: splitTextItems,
+	requestPayload := EmbeddingRequest{
+		TextItems: textItems,
 	}
 
 	requestBody, err := json.Marshal(requestPayload)
@@ -77,30 +95,67 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 		return nil, fmt.Errorf("model API returned status %d", resp.StatusCode)
 	}
 
-	var inferenceResponse InferenceResponse
+	var inferenceResponse TResponse
 	if err := json.NewDecoder(resp.Body).Decode(&inferenceResponse); err != nil {
 		logger.Errorf("Error decoding response for request %s to model %s: %v", requestBody, model, err)
 		return nil, err
 	}
 
-	// Convert to EmbeddingResponse
-	embeddings := make([]EmbeddingResponse, len(inferenceResponse.Results))
-	for i, item := range inferenceResponse.Results {
-		offsetStr, ok := item.Metadata.Extra["Offset"]
-		if !ok {
-			return nil, fmt.Errorf("missing Offset in Metadata.Extra for item %d", i)
-		}
-		offset, err := strconv.Atoi(offsetStr)
+	return &inferenceResponse, nil
+}
+
+func fetchEmbeddings[T interface{ DenseResponse | SparseResponse }](
+	batch []TextItem,
+	model string,
+	callFn func([]TextItem, string) (*T, error),
+	ch chan<- T,
+	errChan chan<- error,
+	wg *sync.WaitGroup,
+) {
+	defer wg.Done()
+
+	resp, err := callFn(batch, model)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	ch <- *resp
+}
+
+// GetEmbeddings retrieves embeddings for an array of text items
+func GetEmbeddings(textItems []TextItem, denseModel, sparseModel string, chunkSize, chunkOverlap, batchSize int) ([]EmbeddingResponse, error) {
+	logger.Debugf("Splitting text items into chunks of size %d with overlap %d", chunkSize, chunkOverlap)
+
+	splitTextItems := splitTextItems(textItems, chunkSize, chunkOverlap)
+	batchedItems := batchTextItems(splitTextItems, batchSize)
+
+	denseChan := make(chan DenseResponse, 1)
+	sparseChan := make(chan SparseResponse, 1)
+	errChan := make(chan error, 2)
+
+	var wg sync.WaitGroup
+
+	for _, batch := range batchedItems {
+		wg.Add(2)
+
+		go fetchEmbeddings(batch, denseModel, callEmbeddingsModel[DenseResponse], denseChan, errChan, &wg)
+		go fetchEmbeddings(batch, sparseModel, callEmbeddingsModel[SparseResponse], sparseChan, errChan, &wg)
+	}
+
+	wg.Wait()
+	close(denseChan)
+	close(sparseChan)
+	close(errChan)
+
+	for err := range errChan {
 		if err != nil {
-			return nil, fmt.Errorf("invalid Offset value in Metadata.Extra for item %d: %v", i, err)
-		}
-		embeddings[i] = EmbeddingResponse{
-			ID:        item.Metadata.ID,
-			Text:      item.Text,
-			Offset:    offset,
-			Embedding: item.Vector,
+			return nil, err
 		}
 	}
 
-	return embeddings, nil
+	denseResponse := <-denseChan
+	sparseResponse := <-sparseChan
+
+	return mergeEmbeddings(denseResponse, sparseResponse)
 }

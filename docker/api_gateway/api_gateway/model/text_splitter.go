@@ -97,3 +97,15 @@ func splitTextItems(textItems []TextItem, chunkSize, chunkOverlap int) []TextIte
 
 	return allChunks
 }
+
+func batchTextItems(items []TextItem, batchSize int) [][]TextItem {
+	var batches [][]TextItem
+	for i := 0; i < len(items); i += batchSize {
+		end := i + batchSize
+		if end > len(items) {
+			end = len(items)
+		}
+		batches = append(batches, items[i:end])
+	}
+	return batches
+}
