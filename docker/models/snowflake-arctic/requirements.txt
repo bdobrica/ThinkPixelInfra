@@ -1,0 +1,6 @@
+fastapi[standard]
+uvicorn
+pyyaml
+pyzmq
+onnxruntime[cpu]
+transformers
