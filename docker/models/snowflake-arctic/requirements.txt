@@ -1,6 +1,10 @@
+fast-langdetect
 fastapi[standard]
-uvicorn
+mmh3
+onnxruntime[cpu]
 pyyaml
 pyzmq
-onnxruntime[cpu]
+spacy
+spacy
 transformers
+uvicorn

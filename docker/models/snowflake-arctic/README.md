@@ -44,7 +44,7 @@ CONTAINER ID   NAME                                CPU %     MEM USAGE / LIMIT  
 
 ## Measured Latency
 
-- startup: 0.08s
+- startup: 1.42s
 - single predict: 0.07s
 
 ## Example
@@ -64,16 +64,11 @@ Example response:
   "results": [
     {
       "text": "This is a very long piece of text ...",
-      "vector": "<base 64 encoded np.float32 array>",
-      "token_weights": {
-        "this": "<base 64 encoded >f packed float32>",
-        "is": "<base 64 encoded >f packed float32>",
-        "a": "<base 64 encoded >f packed float32>",
-        "very": "<base 64 encoded >f packed float32>",
-        "long": "<base 64 encoded >f packed float32>",
-        "piece": "<base 64 encoded >f packed float32>",
-        "of": "<base 64 encoded >f packed float32>",
-        "text": "<base 64 encoded >f packed float32>",
+      "dense_vector": "<base 64 encoded np.float32 array>",
+      "sparse_vector": {
+        "<base 64 encoded >L packed mmh3 of `long`>": "<base 64 encoded >f packed float32 normalized weight>",
+        "<base 64 encoded >L packed mmh3 of `piece`>": "<base 64 encoded >f packed float32 normalized weight>",
+        "<base 64 encoded >L packed mmh3 of `text`>": "<base 64 encoded >f packed float32 normalized weight>",
       },
       "metadata": {
         "id": 1,
@@ -90,8 +85,10 @@ Example response:
 Notes:
 - The `results` field is a list of output text items;
 - The `text` field is the input text item;
-- The `vector` field is a base64 encoded numpy array of type `np.float32`; the vector has dimensions of 1024x1;
-- The `token_weights` field is a dictionary of token weights, where the key is the token and the value is a base64 encoded packed big-endian float32; the number represents the summed average attention (for each head) of the token relative to `<s>` token in the input text item; special tokens and punctuation are excluded from the token weights; the weights are not normalised and are not guaranteed to sum to 1.0 (the sum will be less than 1.0);
+- The `dense_vector` field is a base64 encoded numpy array of type `np.float32`; the vector has dimensions of 1024x1;
+- The `sparse_vector` field is a dictionary of token integer indices and their float normalized weights, where:
+    - the key is the base64 packed big-endian unsigned long pack of absolute value of mmh3 of token; special tokens and punctuation are excluded from the token weights; tokens are converted to their lowercase lemma form; supported languages are English, French, German, Spanish, Italian and Romanian via spacy;
+    - the value is a base64 encoded packed big-endian float32; the number represents the summed average attention (for each head) of the token relative to `<s>` token in the input text item; the weights are normalized to 1.0;
 - The `metadata` field is optional and can be used to store additional information about the input text item. It is passed through to the output unchanged;
     - The `id` field is an integer identifier for the input text item;
     - The `extra` field is an optional dictionary of additional metadata;
