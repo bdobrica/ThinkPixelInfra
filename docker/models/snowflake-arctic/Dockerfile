@@ -28,6 +28,6 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
 COPY --from=weights /opt/weights/snowflake-arctic/snowflake-arctic-embed-l-v2.0 /app/snowflake-arctic-embed-l-v2.0
 COPY snowflake_arctic snowflake_arctic
 
-ENV VERSION="0.1.1"
+ENV VERSION="0.1.2"
 
 CMD ["python", "-m", "snowflake_arctic"]
