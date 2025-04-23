@@ -67,6 +67,7 @@ jobs:
 
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
+              --build-arg TARGETPLATFORM \
               --file "$folder/Dockerfile" \
               --tag "quay.io/${{ secrets.QUAY_USERNAME }}/thinkpixel-$(basename $folder | tr '_' '-')-multi:$version" \
               --tag "quay.io/${{ secrets.QUAY_USERNAME }}/thinkpixel-$(basename $folder | tr '_' '-')-multi:latest" \
