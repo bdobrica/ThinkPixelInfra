@@ -37,8 +37,8 @@ class InferenceRequest(BaseModel):
 
 class EmbeddingsItem(BaseModel):
     text: str
-    vector: str
-    token_weights: Dict[str, str]
+    dense_vector: str
+    sparse_vector: Dict[str, str]
     metadata: Metadata
 
 

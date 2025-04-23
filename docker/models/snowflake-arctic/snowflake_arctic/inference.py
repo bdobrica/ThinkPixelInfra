@@ -17,7 +17,7 @@ from .config import (
     MODEL_PATH,
     MODEL_ZMQ_WORKER_ADDR,
 )
-from .tokens import map_tokens_to_weights
+from .tokens import build_batch_sparse_vectors
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -85,28 +85,28 @@ def process_task(context: zmq.Context):
                     ),
                 },
             )
-            batch_embeddings = model_output[0]
+            batch_dense_vectors = model_output[0]
             batch_weights = model_output[1]
 
             # Prepare results
-            batch_token_weights = map_tokens_to_weights(
+            batch_sparse_vectors = build_batch_sparse_vectors(
                 batch_tokens,  # type: ignore
                 batch_weights,
             )
 
             results = []
-            for text_item, embedding, token_weights in zip(
+            for text_item, dense_vector, sparse_vector in zip(
                 text_items,
-                batch_embeddings,
-                batch_token_weights,
+                batch_dense_vectors,
+                batch_sparse_vectors,
             ):
                 results.append(
                     {
                         "text": text_item.get("text", ""),
-                        "vector": base64.b64encode(
-                            embedding.flatten().tobytes()
+                        "dense_vector": base64.b64encode(
+                            dense_vector.flatten().tobytes()
                         ).decode("utf-8"),
-                        "token_weights": token_weights,
+                        "sparse_vector": sparse_vector,
                         "metadata": text_item.get("metadata", {}),
                     }
                 )
