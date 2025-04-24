@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"api_gateway/logger"
 	"api_gateway/middleware"
 	"api_gateway/model"
+	"api_gateway/qdrantconn"
 	"api_gateway/redisconn"
 	"api_gateway/utils"
 )
@@ -17,6 +19,23 @@ type StoreRequest []struct {
 	ID    int               `json:"id"`
 	Text  string            `json:"text"`
 	Extra map[string]string `json:"extra,omitempty"`
+}
+
+type StoreCallback func([]model.EmbeddingResponse) (int, error)
+
+func getStoreCallback(cacheEntry auth.CacheEntry) (StoreCallback, error) {
+	switch cacheEntry.IndexingNodeType {
+	case "qdrant":
+		return func(embeddings []model.EmbeddingResponse) (int, error) {
+			return qdrantconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings)
+		}, nil
+	case "redis":
+		return func(embeddings []model.EmbeddingResponse) (int, error) {
+			return redisconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported IndexingNode: %s", cacheEntry.IndexingNode)
+	}
 }
 
 // StoreHandler handles storing webpage data
@@ -67,7 +86,15 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case embeddings := <-responseChan:
-		storedCount, err := redisconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings)
+		// Get the store callback function based on the indexing node type
+		storeCallback, err := getStoreCallback(cacheEntry)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error getting store callback: "+err.Error())
+			return
+		}
+
+		// Store embeddings in the database
+		storedCount, err := storeCallback(embeddings)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error storing documents: "+err.Error())
 			return

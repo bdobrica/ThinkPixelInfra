@@ -26,9 +26,10 @@ type InferenceRequest struct {
 }
 
 type EmbeddingsItem struct {
-	Text     string   `json:"text"`
-	Vector   string   `json:"vector"`
-	Metadata Metadata `json:"metadata"`
+	Text         string            `json:"text"`
+	DenseVector  string            `json:"dense_vector"`
+	SparseVector map[string]string `json:"sparse_vector"`
+	Metadata     Metadata          `json:"metadata"`
 }
 
 type InferenceResponse struct {
@@ -37,10 +38,11 @@ type InferenceResponse struct {
 }
 
 type EmbeddingResponse struct {
-	ID        int    `json:"id"`
-	Text      string `json:"text"`
-	Offset    int    `json:"offset"`
-	Embedding string `json:"embedding"`
+	ID           int             `json:"id"`
+	Text         string          `json:"text"`
+	Offset       int             `json:"offset"`
+	DenseVector  []float32       `json:"dense_vector"`
+	SparseVector map[int]float32 `json:"sparse_vector"`
 }
 
 // GetEmbeddings retrieves embeddings for an array of text items
@@ -88,17 +90,32 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 	for i, item := range inferenceResponse.Results {
 		offsetStr, ok := item.Metadata.Extra["Offset"]
 		if !ok {
+			logger.Errorf("Missing Offset in Metadata.Extra for item %d", i)
 			return nil, fmt.Errorf("missing Offset in Metadata.Extra for item %d", i)
 		}
 		offset, err := strconv.Atoi(offsetStr)
 		if err != nil {
+			logger.Errorf("Invalid Offset value in Metadata.Extra for item %d: %v", i, err)
 			return nil, fmt.Errorf("invalid Offset value in Metadata.Extra for item %d: %v", i, err)
 		}
+
+		decodedDenseVector, err := decodeFloatArray(item.DenseVector)
+		if err != nil {
+			logger.Errorf("Error decoding dense vector for item %d: %v", i, err)
+			return nil, fmt.Errorf("error decoding dense vector for item %d: %v", i, err)
+		}
+		decodedSparseVector, err := decodeFloatMap(item.SparseVector)
+		if err != nil {
+			logger.Errorf("Error decoding sparse vector for item %d: %v", i, err)
+			return nil, fmt.Errorf("error decoding sparse vector for item %d: %v", i, err)
+		}
+
 		embeddings[i] = EmbeddingResponse{
-			ID:        item.Metadata.ID,
-			Text:      item.Text,
-			Offset:    offset,
-			Embedding: item.Vector,
+			ID:           item.Metadata.ID,
+			Text:         item.Text,
+			Offset:       offset,
+			DenseVector:  decodedDenseVector,
+			SparseVector: decodedSparseVector,
 		}
 	}
 
