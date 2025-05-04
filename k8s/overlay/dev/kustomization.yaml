@@ -1,3 +1,4 @@
+---
 resources:
   - ../../base/namespace
   - ../../base/secrets

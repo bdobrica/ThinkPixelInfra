@@ -1,3 +1,5 @@
+---
 resources:
+  - autoscaling.yaml
   - deployment.yaml
   - service.yaml
