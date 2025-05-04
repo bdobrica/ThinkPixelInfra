@@ -12,6 +12,7 @@ import (
 // CacheEntry represents an in-memory cache entry for an API key
 type CacheEntry struct {
 	ID               int
+	IndexingNodeType string
 	IndexingNode     string
 	ExpiresAt        time.Time
 	MaxSearchResults int
@@ -55,6 +56,7 @@ func GetCachedAPIKeyData(hashedKey string) (CacheEntry, error) {
 	// Add the valid key to the cache
 	cacheEntry := CacheEntry{
 		ID:               keyDetails.ID,
+		IndexingNodeType: keyDetails.IndexingNodeType,
 		IndexingNode:     keyDetails.IndexingNode,
 		ExpiresAt:        keyDetails.ExpiresAt,
 		MaxSearchResults: keyDetails.MaxSearchResults,

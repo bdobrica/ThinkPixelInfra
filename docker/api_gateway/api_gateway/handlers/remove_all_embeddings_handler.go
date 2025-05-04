@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"api_gateway/auth"
 	"api_gateway/logger"
 	"api_gateway/middleware"
+	"api_gateway/qdrantconn"
 	"api_gateway/redisconn"
 	"api_gateway/utils"
 )
@@ -17,6 +19,23 @@ type RemoveAllEmbeddingsRequest struct {
 
 type RemoveMultipleEmbeddingsRequest struct {
 	IDs []string `json:"ids"`
+}
+
+type RemoveAllEmbeddingsCallback func(string) error
+
+func getRemoveAllEmbeddingsCallback(cacheEntry auth.CacheEntry) (RemoveAllEmbeddingsCallback, error) {
+	switch cacheEntry.IndexingNodeType {
+	case "qdrant":
+		return func(id string) error {
+			return qdrantconn.RemoveAllEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, id)
+		}, nil
+	case "redis":
+		return func(id string) error {
+			return redisconn.RemoveAllEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, id)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported IndexingNode: %s", cacheEntry.IndexingNode)
+	}
 }
 
 func RemoveEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +54,14 @@ func RemoveEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := redisconn.RemoveAllEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, req.ID)
+	removeAllEmbeddingsCallback, err := getRemoveAllEmbeddingsCallback(cacheEntry)
+	if err != nil {
+		logger.Errorf("Error getting remove all embeddings callback: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to get remove all embeddings callback")
+		return
+	}
+
+	err = removeAllEmbeddingsCallback(req.ID)
 	if err != nil {
 		logger.Errorf("Error removing all embeddings: %v", err)
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to remove embeddings")
@@ -62,10 +88,19 @@ func RemoveMultipleEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the remove all embeddings callback for the current indexing node type
+	removeAllEmbeddingsCallback, err := getRemoveAllEmbeddingsCallback(cacheEntry)
+	if err != nil {
+		logger.Errorf("Error getting remove all embeddings callback: %v", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to get remove all embeddings callback")
+		return
+	}
+
 	for _, id := range req.IDs {
-		err := redisconn.RemoveAllEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, id)
+		// Call the callback function to remove all embeddings for the given ID
+		err := removeAllEmbeddingsCallback(id)
 		if err != nil {
-			logger.Errorf("Error removing embeddings for ID %s: %v", id, err)
+			logger.Errorf("Error removing all embeddings for ID %s: %v", id, err)
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to remove embeddings")
 			return
 		}

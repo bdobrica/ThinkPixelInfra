@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"api_gateway/logger"
 	"api_gateway/middleware"
 	"api_gateway/model"
+	"api_gateway/qdrantconn"
 	"api_gateway/redisconn"
 	"api_gateway/utils"
 )
@@ -16,6 +18,23 @@ import (
 type SearchRequest struct {
 	Text string `json:"text"`
 	ID   int    `json:"id"`
+}
+
+type SearchCallback func([]model.EmbeddingResponse) ([]map[string]interface{}, error)
+
+func getSearchCallback(cacheEntry auth.CacheEntry) (SearchCallback, error) {
+	switch cacheEntry.IndexingNodeType {
+	case "qdrant":
+		return func(embeddings []model.EmbeddingResponse) ([]map[string]interface{}, error) {
+			return qdrantconn.SearchEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings, cacheEntry.MaxSearchResults)
+		}, nil
+	case "redis":
+		return func(embeddings []model.EmbeddingResponse) ([]map[string]interface{}, error) {
+			return redisconn.SearchEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings, cacheEntry.MaxSearchResults)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported IndexingNode: %s", cacheEntry.IndexingNode)
+	}
 }
 
 // SearchHandler handles embedding creation and ANN search
@@ -62,8 +81,15 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case embeddings := <-embeddingChan:
-		// Perform ANN search on Redis for all embeddings
-		results, err := redisconn.SearchEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings, cacheEntry.MaxSearchResults)
+		// Get the search callback based on the indexing node type
+		searchCallback, err := getSearchCallback(cacheEntry)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error getting search callback: "+err.Error())
+			return
+		}
+
+		// Perform ANN search
+		results, err := searchCallback(embeddings)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error performing ANN search")
 			return

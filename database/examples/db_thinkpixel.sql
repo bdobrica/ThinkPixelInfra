@@ -18,6 +18,7 @@ INSERT INTO `wp_thinkpixel_sites` (
     `model`,
     `chunk_size`,
     `chunk_overlap`,
+    `indexing_node_type`,
     `indexing_node`,
     `estimated_pages`,
     `average_page_size`,
@@ -43,6 +44,7 @@ INSERT INTO `wp_thinkpixel_sites` (
     'mpnetv2', -- Model to use for the API key
     512, -- Chunk size for the model
     128, -- Chunk overlap for the model
+    `redis`, -- Type of indexing node (e.g. Redis, Qdrant)
     'redis-sentinel:26379/mymaster', -- Redis server pointer <host>:<port>/<master_name>
     500, -- Estimated 500 pages on the website
     2048, -- Estimated 2048 bytes per page of text content
@@ -51,12 +53,20 @@ INSERT INTO `wp_thinkpixel_sites` (
 );
 
 INSERT INTO `wp_thinkpixel_index_nodes` (
-    `master_name`,
+    `node_name`,
+    `node_type`, -- Type of node (e.g. Redis, Qdrant)
     `sentinel_name`,
     `max_capacity_bytes`
 ) VALUES (
     'redis-master-01', -- Unique master name
+    'redis', -- Type of node
     'redis-sentinel-01', -- Unique sentinel name
+    1717986918 -- 1.6GB of memory (80% of 2GB)
+),
+(
+    'qdrant-01', -- Unique master name
+    'qdrant', -- Type of node
+    NULL, -- Qdrant does not require a sentinel name
     1717986918 -- 1.6GB of memory (80% of 2GB)
 );
 

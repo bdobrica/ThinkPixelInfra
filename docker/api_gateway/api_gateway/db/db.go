@@ -21,6 +21,7 @@ var (
 
 type APIKeyDetails struct {
 	ID               int
+	IndexingNodeType string
 	IndexingNode     string
 	ExpiresAt        time.Time
 	MaxSearchResults int
@@ -64,14 +65,14 @@ func GetAPIKeyDetails(hashedKey string) (APIKeyDetails, error) {
 	}
 
 	query := `
-		SELECT id, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
+		SELECT id, indexing_node_type, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
 		FROM wp_thinkpixel_sites
 		WHERE api_key = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
 	row := dbConn.QueryRow(query, hashedKey)
 
 	var keyDetails APIKeyDetails
-	if err := row.Scan(&keyDetails.ID, &keyDetails.IndexingNode, &keyDetails.ExpiresAt, &keyDetails.MaxSearchResults, &keyDetails.Model, &keyDetails.ChunkSize, &keyDetails.ChunkOverlap); err != nil {
+	if err := row.Scan(&keyDetails.ID, &keyDetails.IndexingNodeType, &keyDetails.IndexingNode, &keyDetails.ExpiresAt, &keyDetails.MaxSearchResults, &keyDetails.Model, &keyDetails.ChunkSize, &keyDetails.ChunkOverlap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return APIKeyDetails{}, errors.New("invalid API key")
 		}
@@ -89,20 +90,21 @@ func GetAPIKeyDetailsByID(siteId int) (APIKeyDetails, error) {
 	}
 
 	query := `
-		SELECT id, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
+		SELECT id, indexing_node_type, indexing_node, expires_at, max_search_results, model, chunk_size, chunk_overlap
 		FROM wp_thinkpixel_sites
 		WHERE id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`
 
 	row := dbConn.QueryRow(query, siteId)
 
 	var id int
+	var indexingNodeType string
 	var indexingNode string
 	var expiresAt sql.NullTime
 	var maxSearchResults int
 	var model string
 	var chunkSize int
 	var chunkOverlap int
-	if err := row.Scan(&id, &indexingNode, &expiresAt, &maxSearchResults, &model, &chunkSize, &chunkOverlap); err != nil {
+	if err := row.Scan(&id, &indexingNodeType, &indexingNode, &expiresAt, &maxSearchResults, &model, &chunkSize, &chunkOverlap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return APIKeyDetails{}, errors.New("invalid API key")
 		}
@@ -220,7 +222,7 @@ func ActivateAPIKey(domain, path, apiKey string) error {
         WHERE api_key = ?
         LIMIT 1
     `
-	err = dbConn.QueryRow(lookupQuery, apiKey).Scan(&siteId, &estimatedPages, &averagePageSize, &stDevPageSize)
+	err = dbConn.QueryRow(lookupQuery, hashedApiKey).Scan(&siteId, &estimatedPages, &averagePageSize, &stDevPageSize)
 	if err != nil {
 		// Not strictly fatal here, but you may choose to handle differently
 		logger.Errorf("Failed to retrieve site_id: %v", err)

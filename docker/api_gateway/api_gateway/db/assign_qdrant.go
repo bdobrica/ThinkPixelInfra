@@ -8,15 +8,15 @@ import (
 	"api_gateway/logger"
 )
 
-// AssignToIndexingNode tries to find an active Redis master
+// AssignToQdrantIndexingNode tries to find an active Qdrant node
 // with enough free capacity to handle the requestedMemoryBytes.
 // If found, it assigns the node by creating a record in wp_thinkpixel_index_requests
-// and updating the master’s assigned_memory_bytes.
+// and updating the node's assigned_memory_bytes.
 // If not found, it logs an error, inserts a 'rejected' (or 'pending') request,
 // but does NOT fail overall activation.
 //
 // It uses a transaction + SELECT FOR UPDATE for concurrency safety.
-func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
+func assignToQdrantIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 	dbConn, err := GetDBConnection()
 	if err != nil {
 		return err
@@ -44,10 +44,10 @@ func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 	//    We do ORDER BY so we pick the "best fit" or "first fit" approach.
 	//    The FOR UPDATE ensures we lock the row until the end of the transaction.
 	query := `
-        SELECT id, assigned_memory_bytes, node_name, sentinel_name
+        SELECT id, assigned_memory_bytes, node_name
         FROM wp_thinkpixel_index_nodes
         WHERE status = 'active'
-          AND node_type = 'redis'
+          AND node_type = 'qdrant'
           AND max_capacity_bytes - GREATEST(used_memory_bytes, assigned_memory_bytes) >= ?
         ORDER BY (max_capacity_bytes - GREATEST(used_memory_bytes, assigned_memory_bytes)) ASC
         LIMIT 1
@@ -57,12 +57,12 @@ func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 
 	var (
 		masterID, currentAssigned int
-		nodeName, sentinelName    string
+		nodeName                  string
 	)
-	if scanErr := row.Scan(&masterID, &currentAssigned, &nodeName, &sentinelName); scanErr != nil {
+	if scanErr := row.Scan(&masterID, &currentAssigned, &nodeName); scanErr != nil {
 		if errors.Is(scanErr, sql.ErrNoRows) {
 			// No capacity found on any active node. Log, but do not fail activation.
-			logger.Warningf("[WARN] No Redis master node can accommodate %d bytes for API key %d",
+			logger.Warningf("[WARN] No Qdrant master node can accommodate %d bytes for API key %d",
 				requestedMemoryBytes, siteId,
 			)
 
@@ -81,7 +81,7 @@ func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 			return nil
 		}
 		// Other DB errors
-		logger.Errorf("Failed to scan Redis master node: %v", scanErr)
+		logger.Errorf("Failed to scan Qdrant master node: %v", scanErr)
 		return scanErr
 	}
 
@@ -92,7 +92,7 @@ func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
         WHERE id = ?
     `
 	if _, err = tx.Exec(updateMaster, requestedMemoryBytes, masterID); err != nil {
-		logger.Errorf("Failed to update assigned_memory_bytes on Redis master %d: %v", masterID, err)
+		logger.Errorf("Failed to update assigned_memory_bytes on Qdrant master %d: %v", masterID, err)
 		return err
 	}
 
@@ -117,12 +117,13 @@ func assignToRedisIndexingNode(siteId int, requestedMemoryBytes uint64) error {
         SET indexing_node = ?
         WHERE id = ?
     `
-	indexingNode := fmt.Sprintf("%s:%d/%s", sentinelName, 26379, nodeName)
+	// Construct the indexing node string. Using GRPC for Qdrant (6334).
+	indexingNode := fmt.Sprintf("%s:%d", nodeName, 6334)
 	if _, err = tx.Exec(updateKey, indexingNode, siteId); err != nil {
-		logger.Errorf("Failed to update Redis server on API key %d: %v", siteId, err)
+		logger.Errorf("Failed to update Qdrant server on API key %d: %v", siteId, err)
 		return err
 	} else {
-		logger.Infof("Assigned Redis master %d to API key %d", masterID, siteId)
+		logger.Infof("Assigned Qdrant master %d to API key %d", masterID, siteId)
 	}
 
 	// Transaction will commit in deferred function if there are no errors.

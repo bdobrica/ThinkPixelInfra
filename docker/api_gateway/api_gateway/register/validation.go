@@ -37,7 +37,8 @@ func verifyDomain(domain, path, token string) {
 	}
 	maxAttempts := int32(maxAttemptsRaw)
 
-	url := fmt.Sprintf("https://%s%s%s", domain, path, validationSuffix)
+	protocol := getUrlProtocol()
+	url := fmt.Sprintf("%s://%s%s%s", protocol, domain, path, validationSuffix)
 	client := http.Client{Timeout: timeout}
 
 	logger.Infof("Validate domain %s%s with token %s (attempts: %d)", domain, path, token, maxAttempts)

@@ -2,7 +2,6 @@ package redisconn
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -210,23 +209,22 @@ func StoreEmbeddings(siteID int, indexingNode string, embeddings []model.Embeddi
 	}
 
 	var maxDim int = 0
-	for _, emb := range embeddings {
-		key := fmt.Sprintf("%s%d:%d", prefix, emb.ID, emb.Offset)
-		embeddingBytes, err := base64.StdEncoding.DecodeString(emb.Embedding)
-		if err != nil {
-			logger.Errorf("Error decoding embedding for ID %d: %v", emb.ID, err)
-			return storedCount, fmt.Errorf("failed to decode embedding: %w", err)
+	for _, embedding := range embeddings {
+		key := fmt.Sprintf("%s%d:%d", prefix, embedding.ID, embedding.Offset)
+		if len(embedding.DenseVector) > maxDim {
+			maxDim = len(embedding.DenseVector)
 		}
 
-		// Check if the embedding has the maximum dimension
-		if len(embeddingBytes)/4 > maxDim {
-			maxDim = len(embeddingBytes) / 4
+		embeddingBytes, err := json.Marshal(embedding.DenseVector)
+		if err != nil {
+			logger.Errorf("Error marshaling embedding: %v", err)
+			return storedCount, fmt.Errorf("failed to marshal embedding: %w", err)
 		}
 
 		fields := map[string]interface{}{
-			"id":        emb.ID,
-			"text":      emb.Text,
-			"offset":    emb.Offset,
+			"id":        embedding.ID,
+			"text":      embedding.Text,
+			"offset":    embedding.Offset,
 			"embedding": embeddingBytes,
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
@@ -240,11 +238,11 @@ func StoreEmbeddings(siteID int, indexingNode string, embeddings []model.Embeddi
 		storedCount++
 
 		// Update offsets map
-		offsetMapKey := fmt.Sprintf("~%s:%d", prefix, emb.ID)
+		offsetMapKey := fmt.Sprintf("~%s:%d", prefix, embedding.ID)
 		if _, ok := offsetsMap[offsetMapKey]; !ok {
 			offsetsMap[offsetMapKey] = []int{}
 		}
-		offsetsMap[offsetMapKey] = append(offsetsMap[offsetMapKey], emb.Offset)
+		offsetsMap[offsetMapKey] = append(offsetsMap[offsetMapKey], embedding.Offset)
 	}
 
 	logger.Debugf("Successfully stored %d documents", storedCount)
@@ -291,11 +289,11 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 		return nil, fmt.Errorf("failed to get Redis client: %w", err)
 	}
 
-	for _, emb := range embeddings {
-		embeddingBytes, err := base64.StdEncoding.DecodeString(emb.Embedding)
+	for _, embedding := range embeddings {
+		embeddingBytes, err := json.Marshal(embedding.DenseVector)
 		if err != nil {
-			logger.Errorf("Error decoding embedding: %v", err)
-			return nil, fmt.Errorf("failed to decode embedding: %w", err)
+			logger.Errorf("Error marshaling embedding: %v", err)
+			return nil, fmt.Errorf("failed to marshal embedding: %w", err)
 		}
 
 		logger.Debugf("Performing search for embedding with size %d bytes", len(embeddingBytes))
@@ -353,9 +351,10 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 			}
 
 			// Convert score to float64
-			var score float64
+			var score float32
 			if rawScore, ok := docMap["score"].(string); ok {
-				score, err = strconv.ParseFloat(rawScore, 64)
+				score64, err := strconv.ParseFloat(rawScore, 32)
+				score = float32(score64)
 				if err != nil {
 					logger.Errorf("Failed to parse score as float64: %v", err)
 					continue
@@ -365,7 +364,7 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 				score = 0 - score // Negative scores are not allowed
 			}
 			// Convert score to a percentage
-			score = 100 * (1 - score)
+			score = 100.0 * (1.0 - score)
 
 			// Add the processed document to results
 			results = append(results, map[string]interface{}{
