@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +8,11 @@ metadata:
     app.kubernetes.io/version: 0.1.0
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: ml-model
@@ -15,17 +21,50 @@ spec:
       labels:
         app.kubernetes.io/name: ml-model
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ml-model
       containers:
         - name: ml-model
           image: quay.io/bdobrica/thinkpixel-model-multi:0.1.6
           ports:
             - containerPort: 8000
+          env:
+            - name: MODEL_NUM_WORKERS
+              value: "1"
           resources:
             limits:
               memory: 3Gi
             requests:
               cpu: 1000m
               memory: 3Gi
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 1
+            failureThreshold: 20
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 5
       imagePullSecrets:
         - name: quay-io-credentials
-

@@ -2,19 +2,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mpnetv2
+  name: snowflake-arctic
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: mpnetv2
+      app.kubernetes.io/name: snowflake-arctic
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: mpnetv2
+        app.kubernetes.io/name: snowflake-arctic
     spec:
       containers:
         - name: ml-model
-          image: quay.io/bdobrica/thinkpixel-mpnetv2-multi:0.1.6
+          image: quay.io/bdobrica/thinkpixel-snowflake-arctic-multi:0.1.2
           resources:
             limits:
               memory: 3Gi

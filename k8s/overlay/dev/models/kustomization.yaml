@@ -1,2 +1,4 @@
+---
 resources:
   - ./mpnetv2
+  - ./snowflake-arctic
