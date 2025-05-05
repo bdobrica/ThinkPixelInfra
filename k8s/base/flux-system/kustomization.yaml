@@ -1,6 +1,6 @@
 ---
 resources:
   - flux-instance.yaml
-  # - flux-notification.yaml
-  # - flux-operator.yaml
+  - flux-notification.yaml
+  - flux-operator.yaml
   - flux-runtime-info.yaml
