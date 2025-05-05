@@ -1,0 +1,25 @@
+---
+resources:
+  - ../../../base/flux-system
+
+patches:
+  - target:
+      kind: FluxInstance
+      name: flux
+    patch: |-
+      - op: replace
+        path: /spec/cluster/domain
+        value: dev.thinkpixel.io
+      - op: replace
+        path: /spec/sync/path
+        value: k8s/overlay/dev/flux-system
+  - target:
+      kind: ConfigMap
+      name: flux-runtime-info
+    patch: |-
+      - op: replace
+        path: /data/ENVIRONMENT
+        value: dev
+      - op: replace
+        path: /data/CLUSTER_DOMAIN
+        value: dev.thinkpixel.io
