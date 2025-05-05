@@ -1,0 +1,9 @@
+---
+resources:
+  - ../../base/mysql
+
+patches:
+  - path: ./mysql-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: mysql-secret

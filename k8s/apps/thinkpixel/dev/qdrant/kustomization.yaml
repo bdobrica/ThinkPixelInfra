@@ -1,0 +1,15 @@
+---
+resources:
+  - ../../base/qdrant
+
+namespace: thinkpixel
+
+patches:
+  - path: stateful-set-patch.yaml
+    target:
+      kind: StatefulSet
+      name: qdrant
+  - path: ./qdrant-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: qdrant-secret

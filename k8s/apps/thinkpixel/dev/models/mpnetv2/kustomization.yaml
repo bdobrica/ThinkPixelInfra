@@ -1,0 +1,54 @@
+---
+resources:
+  - ../../../base/ml-model
+
+patches:
+  - target:
+      kind: Deployment
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: mpnetv2
+      - op: replace
+        path: /spec/selector/matchLabels/app.kubernetes.io~1name
+        value: mpnetv2
+      - op: replace
+        path: /spec/template/metadata/labels/app.kubernetes.io~1name
+        value: mpnetv2
+      - op: replace
+        path: /spec/template/spec/topologySpreadConstraints/0/labelSelector/matchLabels/app.kubernetes.io~1name
+        value: mpnetv2
+  - target:
+      kind: Service
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: mpnetv2
+      - op: replace
+        path: /spec/selector/app.kubernetes.io~1name
+        value: mpnetv2
+  - target:
+      kind: PodDisruptionBudget
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: mpnetv2
+      - op: replace
+        path: /spec/selector/matchLabels/app.kubernetes.io~1name
+        value: mpnetv2
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: mpnetv2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+      - op: replace
+        path: /spec/scaleTargetRef/name
+        value: mpnetv2

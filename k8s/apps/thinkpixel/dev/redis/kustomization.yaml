@@ -1,0 +1,11 @@
+---
+resources:
+  - ../../base/redis/secrets
+  - ./shard-01
+  - ./sentinel-01
+
+patches:
+  - path: ./redis-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: redis-secret

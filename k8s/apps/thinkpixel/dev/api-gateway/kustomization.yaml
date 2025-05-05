@@ -1,0 +1,13 @@
+---
+resources:
+  - ../../base/api-gateway
+
+patches:
+  - path: ./api-gateway-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: api-gateway-secret
+  - path: ./fluent-bit-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: fluent-bit-secret
