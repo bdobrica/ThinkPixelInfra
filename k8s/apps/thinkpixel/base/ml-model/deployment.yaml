@@ -67,4 +67,4 @@ spec:
             timeoutSeconds: 1
             failureThreshold: 5
       imagePullSecrets:
-        - name: quay-io-credentials
+        - name: quay-io-secret

@@ -91,4 +91,4 @@ spec:
             - name: fluent-bit-storage
               mountPath: /tmp/fluent-bit
       imagePullSecrets:
-        - name: quay-io-credentials
+        - name: quay-io-secret
