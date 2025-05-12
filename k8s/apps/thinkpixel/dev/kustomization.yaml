@@ -1,0 +1,7 @@
+resources:
+  - ./api-gateway
+  - ./models
+  - ./mysql
+  - ./qdrant
+  - ./redis
+  - ./secrets

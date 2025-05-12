@@ -1,0 +1,51 @@
+---
+resources:
+  - ../../../base/ml-model
+
+patches:
+  - target:
+      kind: Deployment
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/selector/matchLabels/app.kubernetes.io~1name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/template/metadata/labels/app.kubernetes.io~1name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/template/spec/topologySpreadConstraints/0/labelSelector/matchLabels/app.kubernetes.io~1name
+        value: snowflake-arctic
+  - target:
+      kind: Service
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/selector/app.kubernetes.io~1name
+        value: snpowflake-arctic
+  - target:
+      kind: PodDisruptionBudget
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/selector/matchLabels/app.kubernetes.io~1name
+        value: snowflake-arctic
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: .*
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: snowflake-arctic
+      - op: replace
+        path: /spec/scaleTargetRef/name
+        value: snowflake-arctic

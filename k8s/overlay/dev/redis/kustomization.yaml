@@ -1,5 +1,0 @@
----
-resources:
-  - ../../../base/redis/secrets
-  - ./shard-01
-  - ./sentinel-01
