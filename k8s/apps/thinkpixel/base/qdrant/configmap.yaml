@@ -9,7 +9,7 @@ metadata:
 data:
   initialize.sh: |
     #!/bin/sh
-    SET_INDEX=${HOSTNAME##*-}
+    SET_INDEX=$${HOSTNAME##*-}
     # echo "Starting initializing for pod $SET_INDEX and snapshots restoration"
     # exec ./entrypoint.sh --uri 'http://qdrant-0.qdrant:6335' --snapshot ...
     echo "Starting initializing for pod $SET_INDEX"

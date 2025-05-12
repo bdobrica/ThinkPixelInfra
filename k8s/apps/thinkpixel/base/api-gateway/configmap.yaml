@@ -61,12 +61,12 @@ data:
     [OUTPUT]
         name        s3
         match       *
-        bucket      ${FLUENT_BIT_S3_BUCKET}
-        endpoint    ${FLUENT_BIT_S3_ENDPOINT}
+        bucket      $${FLUENT_BIT_S3_BUCKET}
+        endpoint    $${FLUENT_BIT_S3_ENDPOINT}
         total_file_size 10M
         upload_timeout 10m
         store_dir   /tmp/fluent-bit/s3
-        s3_key_format /logs/${FLUENT_BIT_CLUSTER_NAME}/${POD_NAME}/%Y-%m-%d/%H/requests.jsonl
+        s3_key_format /logs/$${FLUENT_BIT_CLUSTER_NAME}/$${POD_NAME}/%Y-%m-%d/%H/requests.jsonl
   parsers.conf: |
     [PARSER]
         Name        json
