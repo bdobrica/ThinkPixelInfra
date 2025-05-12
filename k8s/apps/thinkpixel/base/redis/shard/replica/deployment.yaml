@@ -44,10 +44,10 @@ spec:
             - /bin/sh
             - -c
             - |
-              SUFFIX=${POD_NAME#redis-replica-}; SUFFIX=${SUFFIX%-*}; SUFFIX=${SUFFIX%-*}
+              SUFFIX=$${POD_NAME#redis-replica-}; SUFFIX=$${SUFFIX%-*}; SUFFIX=$${SUFFIX%-*}
               redis-stack-server \
               --appendonly yes \
-              --requirepass ${REDIS_PASSWORD} \
+              --requirepass $${REDIS_PASSWORD} \
               --replicaof redis-master-$SUFFIX 6379 \
               --maxmemory 1800mb
       affinity:

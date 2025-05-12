@@ -43,13 +43,13 @@ spec:
                     exit 1
                   fi
                   echo "sentinel monitor $master $master_ip 6379 2" >> /etc/sentinel/sentinel.conf
-                  echo "sentinel auth-pass $master ${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
+                  echo "sentinel auth-pass $master $${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
                   echo "sentinel down-after-milliseconds $master 5000" >> /etc/sentinel/sentinel.conf
                   echo "sentinel failover-timeout $master 10000" >> /etc/sentinel/sentinel.conf
                   echo "sentinel parallel-syncs $master 1" >> /etc/sentinel/sentinel.conf
                 fi
               done < /etc/config-template/masters
-              echo "requirepass ${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
+              echo "requirepass $${REDIS_PASSWORD}" >> /etc/sentinel/sentinel.conf
           resources:
             limits:
               memory: 256Mi

@@ -36,7 +36,7 @@ spec:
             - |
               redis-stack-server \
               --appendonly yes \
-              --requirepass ${REDIS_PASSWORD} \
+              --requirepass $${REDIS_PASSWORD} \
               --maxmemory 1800mb
           ports:
             - containerPort: 6379
