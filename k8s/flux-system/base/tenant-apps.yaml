@@ -54,7 +54,7 @@ spec:
         sourceRef:
           kind: GitRepository
           name: flux-system
-        path: "./k8s/<< inputs.tenant >>/<< inputs.environment >>"
+        path: "./k8s/apps/<< inputs.tenant >>/<< inputs.environment >>"
         prune: true
         postBuild:
           substituteFrom:
