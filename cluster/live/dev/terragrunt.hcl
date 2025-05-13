@@ -29,6 +29,10 @@ inputs = merge(
                 server_type = "cax21"
                 count = 3
             }
+            pool2 = {
+                server_type = "cax21"
+                count = 1
+            }
         }
     },
     local.secrets.inputs,
