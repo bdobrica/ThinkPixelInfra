@@ -4,6 +4,12 @@ variable "cluster_domain" {
   type        = string
 }
 
+variable "cluster_domain_aliases" {
+  description = "A list of domain aliases for the cluster"
+  type        = list(string)
+  default     = []
+}
+
 variable "cluster_prefix" {
   description = "The name prefix for all nodes. It will have the format <cluster_prefix>-<node_prefix>-<index>"
   default     = "k8s"
@@ -77,4 +83,10 @@ variable "worker_public_ssh_key" {
 variable "worker_private_ssh_key" {
   description = "The private SSH key to use for worker node access"
   type        = string
+}
+
+variable "admin_ips" {
+  description = "A list of IP addresses that are allowed to access the firewall."
+  type        = list(string)
+  default     = []
 }

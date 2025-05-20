@@ -4,10 +4,21 @@ variable "hcloud_token" {
   description = "Value of the Hetzner Cloud API token"
 }
 
+variable "hetznerdns_token" {
+  sensitive   = true # Requires terraform >= 0.14
+  description = "Value of the Hetzner DNS API token"
+}
+
 variable "cluster_domain" {
   description = "The domain name of the cluster"
   default     = "cluster.local"
   type        = string
+}
+
+variable "cluster_domain_aliases" {
+  description = "A list of domain aliases for the cluster"
+  type        = list(string)
+  default     = []
 }
 
 variable "cluster_prefix" {
@@ -75,4 +86,25 @@ variable "worker_public_ssh_key" {
 variable "worker_private_ssh_key" {
   description = "The private SSH key to use for worker node access"
   type        = string
+}
+
+variable "admin_ips" {
+  description = "A list of IP addresses that are allowed to access the firewall."
+  type        = list(string)
+  default     = []
+}
+
+variable "exposed_apps" {
+  description = "A list of applications to expose via the firewall."
+  type = map(object({
+    protocol = string
+    port     = number
+    health_check = optional(object({
+      path     = string
+      interval = optional(number, 15) # Default interval for health checks
+      timeout  = optional(number, 10) # Default timeout for health checks
+      retries  = optional(number, 3)  # Default retries for health checks
+    }))
+  }))
+  default = {}
 }

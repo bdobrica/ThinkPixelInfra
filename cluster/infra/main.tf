@@ -2,8 +2,13 @@
 terraform {
   required_version = ">= 1.10.0"
 }
+
 provider "hcloud" {
   token = var.hcloud_token
+}
+
+provider "hetznerdns" {
+  apitoken = var.hetznerdns_token
 }
 
 module "network" {
@@ -16,6 +21,7 @@ module "k8s" {
   source = "./k8s"
 
   cluster_domain            = var.cluster_domain
+  cluster_domain_aliases    = var.cluster_domain_aliases
   cluster_prefix            = var.cluster_prefix
   network                   = module.network.network
   subnet                    = module.network.subnet
@@ -28,4 +34,13 @@ module "k8s" {
   master_private_ssh_key    = var.master_private_ssh_key
   worker_public_ssh_key     = var.worker_public_ssh_key
   worker_private_ssh_key    = var.worker_private_ssh_key
+  admin_ips                 = var.admin_ips
+}
+
+module "apps" {
+  source                 = "./apps"
+  cluster_domain         = var.cluster_domain
+  cluster_domain_aliases = var.cluster_domain_aliases
+  worker_load_balancer   = module.k8s.worker_load_balancer
+  exposed_apps           = var.exposed_apps
 }

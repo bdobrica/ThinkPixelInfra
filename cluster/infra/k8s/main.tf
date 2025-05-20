@@ -29,3 +29,13 @@ module "worker" {
   master_ip                 = module.master.ip
   worker_private_ssh_key    = var.worker_private_ssh_key
 }
+
+module "firewall" {
+  source = "../firewall"
+
+  name         = format("%s-firewall", var.cluster_prefix)
+  master_nodes = module.master.nodes
+  worker_nodes = module.worker.nodes
+  admin_ips    = var.admin_ips
+  depends_on   = [module.master, module.worker]
+}
