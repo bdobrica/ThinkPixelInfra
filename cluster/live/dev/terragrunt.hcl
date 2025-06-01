@@ -17,6 +17,7 @@ inputs = merge(
     {
         hcloud_token = "dummy"
         cluster_domain = "dev.thinkpixel.io"
+        cluster_domain_aliases = [ "thinkpixel.io" ]
         cluster_prefix = "k8s"
         location = "fsn1"
         os_image = "debian-12"
@@ -25,9 +26,30 @@ inputs = merge(
             count = 1
         }
         worker_pools = {
-            pool1 = {
+            api = {
                 server_type = "cax21"
                 count = 3
+            }
+            monitor = {
+                server_type = "cax21"
+                count = 1
+            }
+        }
+        admin_ips = [ "135.181.209.167" ]
+        exposed_apps = {
+            "api" = {
+                protocol = "https"
+                port = 8080
+                health_check = {
+                    path = "/ping"
+                }
+            },
+            "monitor" = {
+                protocol = "https"
+                port = 3000
+                health_check = {
+                    path = "/api/health"
+                }
             }
         }
     },

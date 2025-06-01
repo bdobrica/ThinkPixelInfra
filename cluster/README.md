@@ -55,7 +55,8 @@ Create a .secrets.hcl file in the [cluster/live/{dev,prod}](./infra/live/dev) di
 
 ```hcl
 inputs = {
-    hcloud_token = "your-hetzner-api-token"
+    hcloud_token     = "your-hetzner-api-token"
+    hetznerdns_token = "your-hetzner-dns-api-token"
 }
 ```
 
@@ -86,6 +87,7 @@ inputs = merge(
     {
         hcloud_token = "dummy" # no need to change; value will be overridden by secrets
         cluster_domain = "<cluster_domain>" # e.g., "cluster.local"
+        cluster_domain_aliases = [] # List of domain aliases for the cluster, if any
         cluster_prefix = "<cluster_prefix>" # e.g., "k8s", prefix for all nodes
         location = "<location>" # e.g., "fsn1"
         os_image = "<os_image>" # e.g., "debian-12"
@@ -97,6 +99,20 @@ inputs = merge(
             <pool_name_01> = { # e.g., "pool01"
                 server_type = "<server_type>" # e.g., "cax21"
                 count = <count> # e.g., 2; number of worker nodes to create
+            }
+        }
+        admin_ips = [] # List of IPs allowed to access the firewall
+        exposed_apps = { # This is a map of applications to expose via the firewall
+            # Example of an exposed app
+            "example_app" = {
+                protocol = "https"
+                port = 8000
+                health_check = {
+                    path = "/health"
+                    interval = 15
+                    timeout = 10
+                    retries = 3
+                }
             }
         }
     },

@@ -9,6 +9,12 @@ variable "node_type" {
   type        = string
 }
 
+variable "node_taint" {
+  description = "The taint to apply to the nodes"
+  type        = string
+  default     = ""
+}
+
 variable "master_ip" {
   description = "The IP address of the master node"
   type        = string

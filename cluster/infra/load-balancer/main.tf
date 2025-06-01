@@ -19,6 +19,7 @@ resource "hcloud_load_balancer" "this" {
   name               = var.name
   load_balancer_type = length(var.nodes) <= 25 ? "lb11" : (length(var.nodes) <= 75 ? "lb21" : "lb31")
   location           = var.location
+  delete_protection  = true
   depends_on         = [var.subnet]
 }
 

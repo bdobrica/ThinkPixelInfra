@@ -4,6 +4,7 @@
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.0 |
 | <a name="requirement_hcloud"></a> [hcloud](#requirement\_hcloud) | ~> 1.48 |
+| <a name="requirement_hetznerdns"></a> [hetznerdns](#requirement\_hetznerdns) | 2.1.0 |
 
 ## Providers
 
@@ -13,6 +14,7 @@ No providers.
 
 | Name | Source | Version |
 |------|--------|---------|
+| <a name="module_apps"></a> [apps](#module\_apps) | ./apps | n/a |
 | <a name="module_k8s"></a> [k8s](#module\_k8s) | ./k8s | n/a |
 | <a name="module_network"></a> [network](#module\_network) | ./networking | n/a |
 
@@ -24,9 +26,13 @@ No resources.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_admin_ips"></a> [admin\_ips](#input\_admin\_ips) | A list of IP addresses that are allowed to access the firewall. | `list(string)` | `[]` | no |
 | <a name="input_cluster_domain"></a> [cluster\_domain](#input\_cluster\_domain) | The domain name of the cluster | `string` | `"cluster.local"` | no |
+| <a name="input_cluster_domain_aliases"></a> [cluster\_domain\_aliases](#input\_cluster\_domain\_aliases) | A list of domain aliases for the cluster | `list(string)` | `[]` | no |
 | <a name="input_cluster_prefix"></a> [cluster\_prefix](#input\_cluster\_prefix) | The name prefix for all nodes. It will have the format <cluster\_prefix>-<node\_prefix>-<index> | `string` | `"k8s"` | no |
+| <a name="input_exposed_apps"></a> [exposed\_apps](#input\_exposed\_apps) | A list of applications to expose via the firewall. | <pre>map(object({<br/>    protocol = string<br/>    port     = number<br/>    health_check = optional(object({<br/>      path     = string<br/>      interval = optional(number, 15) # Default interval for health checks<br/>      timeout  = optional(number, 10) # Default timeout for health checks<br/>      retries  = optional(number, 3)  # Default retries for health checks<br/>    }))<br/>  }))</pre> | `{}` | no |
 | <a name="input_hcloud_token"></a> [hcloud\_token](#input\_hcloud\_token) | Value of the Hetzner Cloud API token | `any` | n/a | yes |
+| <a name="input_hetznerdns_token"></a> [hetznerdns\_token](#input\_hetznerdns\_token) | Value of the Hetzner DNS API token | `any` | n/a | yes |
 | <a name="input_location"></a> [location](#input\_location) | The location to create the worker nodes | `string` | `"fsn1"` | no |
 | <a name="input_management_public_ssh_key"></a> [management\_public\_ssh\_key](#input\_management\_public\_ssh\_key) | The public SSH key to use for management access | `string` | n/a | yes |
 | <a name="input_master_pool"></a> [master\_pool](#input\_master\_pool) | The master pool to create | <pre>object({<br/>    server_type = string<br/>    count       = number<br/>  })</pre> | <pre>{<br/>  "count": 1,<br/>  "server_type": "cx22"<br/>}</pre> | no |

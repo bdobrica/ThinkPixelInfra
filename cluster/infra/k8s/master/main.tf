@@ -1,7 +1,7 @@
 # Create the master node(s)
 locals {
-    ip_offset = 11
-    master_ip = cidrhost(var.subnet.ip_range, local.ip_offset)
+  ip_offset = 11
+  master_ip = cidrhost(var.subnet.ip_range, local.ip_offset)
 }
 
 resource "hcloud_server" "this" {

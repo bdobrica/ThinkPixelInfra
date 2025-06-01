@@ -1,4 +1,5 @@
 locals {
+  node_taint = var.node_taint != "" ? var.node_taint : var.node_type
   runcmds = {
     master = [
       "curl https://get.k3s.io | INSTALL_K3S_EXEC=\"server --disable traefik --cluster-domain ${var.cluster_domain}\" sh -",
@@ -13,7 +14,7 @@ locals {
     worker = [
       "until curl -k https://${var.master_ip}:6443; do sleep 5; done",
       "REMOTE_TOKEN=$(ssh -o StrictHostKeyChecking=accept-new cluster@${var.master_ip} sudo cat /var/lib/rancher/k3s/server/node-token)",
-      "curl -sfL https://get.k3s.io | K3S_URL=https://${var.master_ip}:6443 K3S_TOKEN=$REMOTE_TOKEN sh -"
+      "curl -sfL https://get.k3s.io | K3S_URL=https://${var.master_ip}:6443 K3S_TOKEN=$REMOTE_TOKEN sh -s - --node-taint ${var.cluster_domain}/taint=${local.node_taint}:NoSchedule"
     ]
   }
   template = {
