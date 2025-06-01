@@ -17,6 +17,11 @@ spec:
         app.kubernetes.io/component: monitoring
     spec:
       serviceAccountName: prometheus
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "monitor"
+          effect: "NoSchedule"
       containers:
         - name: prometheus
           image: prom/prometheus:v3.1.0

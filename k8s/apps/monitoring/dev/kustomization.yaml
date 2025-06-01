@@ -1,0 +1,4 @@
+resources:
+  - ../base/grafana
+  - ../base/node-exporter
+  - ../base/prometheus

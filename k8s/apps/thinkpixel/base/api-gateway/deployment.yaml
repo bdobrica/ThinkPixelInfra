@@ -16,6 +16,11 @@ spec:
       labels:
         app.kubernetes.io/name: api-gateway
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
       volumes:
         - name: request-logs
           emptyDir: {}

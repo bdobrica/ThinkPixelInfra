@@ -18,6 +18,11 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/component: sentinel
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
       volumes:
         - name: sentinel-config
           emptyDir: {}

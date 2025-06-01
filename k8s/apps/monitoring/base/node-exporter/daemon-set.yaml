@@ -14,6 +14,15 @@ spec:
         app.kubernetes.io/name: node-exporter
         app.kubernetes.io/component: monitoring
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "monitor"
+          effect: "NoSchedule"
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
       hostNetwork: true
       hostPID: true
       containers:

@@ -20,23 +20,28 @@ spec:
         app.kubernetes.io/name: qdrant
         app.kubernetes.io/component: vectordb
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
       initContainers:
-      - name: ensure-dir-ownership
-        image: docker.io/qdrant/qdrant:v1.13.4
-        command:
-          - chown
-          - -R
-          - 1000:2000
-          - /qdrant/storage
-          - /qdrant/snapshots
-          - /qdrant/snapshot-restoration
-        volumeMounts:
-          - name: qdrant-storage
-            mountPath: /qdrant/storage
-          - name: qdrant-snapshots
-            mountPath: /qdrant/snapshots
-          - name: qdrant-snapshot-restoration
-            mountPath: /qdrant/snapshot-restoration
+        - name: ensure-dir-ownership
+          image: docker.io/qdrant/qdrant:v1.13.4
+          command:
+            - chown
+            - -R
+            - 1000:2000
+            - /qdrant/storage
+            - /qdrant/snapshots
+            - /qdrant/snapshot-restoration
+          volumeMounts:
+            - name: qdrant-storage
+              mountPath: /qdrant/storage
+            - name: qdrant-snapshots
+              mountPath: /qdrant/snapshots
+            - name: qdrant-snapshot-restoration
+              mountPath: /qdrant/snapshot-restoration
       containers:
         - name: qdrant
           image: docker.io/qdrant/qdrant:v1.13.4
@@ -79,20 +84,20 @@ spec:
               exec:
                 command: ["sleep", "3"]
           volumeMounts:
-          - name: qdrant-storage
-            mountPath: /qdrant/storage
-          - name: qdrant-config
-            mountPath: /qdrant/config/initialize.sh
-            subPath: initialize.sh
-          - name: qdrant-config
-            mountPath: /qdrant/config/production.yaml
-            subPath: production.yaml
-          - name: qdrant-snapshots
-            mountPath: /qdrant/snapshots
-          - name: qdrant-snapshot-restoration
-            mountPath: /qdrant/snapshot-restoration
-          - name: qdrant-init
-            mountPath: /qdrant/init
+            - name: qdrant-storage
+              mountPath: /qdrant/storage
+            - name: qdrant-config
+              mountPath: /qdrant/config/initialize.sh
+              subPath: initialize.sh
+            - name: qdrant-config
+              mountPath: /qdrant/config/production.yaml
+              subPath: production.yaml
+            - name: qdrant-snapshots
+              mountPath: /qdrant/snapshots
+            - name: qdrant-snapshot-restoration
+              mountPath: /qdrant/snapshot-restoration
+            - name: qdrant-init
+              mountPath: /qdrant/init
       securityContext:
         fsGroup: 3000
         fsGroupChangePolicy: Always

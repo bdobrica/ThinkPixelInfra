@@ -18,6 +18,11 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/component: replica
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
       containers:
         - name: redis-replica
           image: redis/redis-stack:latest

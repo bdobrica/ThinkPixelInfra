@@ -16,6 +16,11 @@ spec:
         app.kubernetes.io/name: grafana
         app.kubernetes.io/component: monitoring
     spec:
+      tolerations:
+        - key: "dev.thinkpixel.io/taint"
+          operator: "Equal"
+          value: "monitor"
+          effect: "NoSchedule"
       containers:
         - name: grafana
           image: grafana/grafana:11.5.1
