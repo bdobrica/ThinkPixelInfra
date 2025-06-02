@@ -1,5 +1,9 @@
 ---
+<<<<<<< HEAD
 resources:
+=======
+resouces:
+>>>>>>> 21687f3333fc5762ec288934b18ae5effdedc6c3
   - configmap.yaml
   - deployment.yaml
   - persistent-volume.yaml
