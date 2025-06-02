@@ -1,0 +1,8 @@
+---
+resouces:
+  - configmap.yaml
+  - deployment.yaml
+  - persistent-volume.yaml
+  - sealed-secret.yaml
+  - service-account.yaml
+  - service.yaml

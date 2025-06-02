@@ -1,4 +1,14 @@
+---
 resources:
   - ../base/grafana
   - ../base/node-exporter
   - ../base/prometheus
+patches:
+  - path: ./grafana-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: grafana-secret
+  - path: ./prometheus-sealed-secret.yaml
+    target:
+      kind: SealedSecret
+      name: prometheus-secret
