@@ -43,3 +43,11 @@ resource "hcloud_firewall" "this" {
     }
   }
 }
+
+resource "hcloud_firewall_attachment" "this" {
+  firewall_id = hcloud_firewall.this.id
+  server_ids = concat(
+    [for server in data.hcloud_server.master : server.id],
+    [for server in data.hcloud_server.worker : server.id]
+  )
+}
