@@ -3,8 +3,8 @@ resource "hcloud_load_balancer_service" "this" {
   for_each         = var.exposed_apps
   load_balancer_id = var.worker_load_balancer.id
   protocol         = each.value.protocol
-  listen_port      = each.value.port
-  destination_port = each.value.port
+  listen_port      = each.value.external_port
+  destination_port = each.value.internal_port
 
   http {
     sticky_sessions = true
@@ -14,7 +14,7 @@ resource "hcloud_load_balancer_service" "this" {
 
   health_check {
     protocol = "http"
-    port     = each.value.port
+    port     = each.value.internal_port
     interval = try(each.value.health_check.interval, 15) # Default interval for health checks
     timeout  = try(each.value.health_check.timeout, 10)  # Default timeout for health checks
     retries  = try(each.value.health_check.retries, 3)   # Default retries for health checks

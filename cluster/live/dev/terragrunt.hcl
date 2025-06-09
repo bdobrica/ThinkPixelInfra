@@ -39,14 +39,16 @@ inputs = merge(
         exposed_apps = {
             "api" = {
                 protocol = "https"
-                port = 8080
+                external_port = 8080
+                internal_port = 30080
                 health_check = {
                     path = "/ping"
                 }
             },
             "monitor" = {
                 protocol = "https"
-                port = 3000
+                external_port = 3000
+                internal_port = 30030
                 health_check = {
                     path = "/api/health"
                 }

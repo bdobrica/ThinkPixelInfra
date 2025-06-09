@@ -18,8 +18,9 @@ variable "worker_load_balancer" {
 variable "exposed_apps" {
   description = "A list of applications to expose via the firewall."
   type = map(object({
-    protocol = string
-    port     = number
+    protocol      = string
+    external_port = number
+    internal_port = number
     health_check = optional(object({
       path     = string
       interval = optional(number, 15) # Default interval for health checks
