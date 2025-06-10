@@ -37,7 +37,7 @@ class InferenceRequest(BaseModel):
 
 class EmbeddingsItem(BaseModel):
     text: str
-    vector: str
+    dense_vector: str
     metadata: Metadata
 
 
@@ -73,9 +73,7 @@ async def ping_zmq_request(timeout: float = 1.0):
     # Prepare request data
     request_id = b"ping-request-" + os.urandom(4)  # Generate unique request ID
     # Minimal request payload for pinging the model
-    request_data = {
-        "text_items": [TextItem(text="ping", metadata=Metadata(id=0)).dict()]
-    }
+    request_data = {"text_items": [TextItem(text="ping", metadata=Metadata(id=0)).dict()]}
 
     message = [request_id, b"", json.dumps(request_data).encode("utf-8")]
 

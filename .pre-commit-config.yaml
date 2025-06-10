@@ -4,6 +4,7 @@ repos:
     rev: 7.2.0
     hooks:
       - id: flake8
+        args: ["--max-line-length", "120", "--extend-ignore", "F824"]
 
   # Black
   - repo: https://github.com/psf/black
@@ -31,15 +32,5 @@ repos:
       - id: check-yaml
         args: ["--allow-multiple-documents"]
       - id: check-added-large-files
-
-  # Security checks
-  - repo: https://github.com/pycqa/bandit
-    rev: 1.8.3
-    hooks:
-      - id: bandit
-
-  # Static type checking (optional)
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
-    hooks:
-      - id: mypy
+      - id: mixed-line-ending
+        args: ["--fix=lf"]

@@ -35,18 +35,14 @@ def load_model():
     model = AutoModel.from_pretrained(MODEL_PATH).to(device)
 
 
-def mean_pooling(
-    token_embeddings: torch.Tensor, attention_mask: Any
-) -> torch.Tensor:
+def mean_pooling(token_embeddings: torch.Tensor, attention_mask: Any) -> torch.Tensor:
     """
     Mean Pooling - Take attention mask into account for correct averaging
     :param model_output: Model output
     :param attention_mask: Attention mask
     :return: Mean pooled vector
     """
-    input_mask_expanded = (
-        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    )
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
     sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
     return sum_embeddings / sum_mask
@@ -72,17 +68,13 @@ def process_task(context: zmq.Context):
             data = json.loads(request)
             text_items = data.get("text_items", [])
 
-            logger.debug(
-                "Received %s text items for inference.", len(text_items)
-            )
+            logger.debug("Received %s text items for inference.", len(text_items))
 
             text_batch = [item.get("text", "") for item in text_items]
 
             # Batch encode and process with the model
             logger.debug("Processing %s chunks...", len(text_batch))
-            encoded_input = tokenizer(
-                text_batch, padding=True, truncation=True, return_tensors="pt"
-            ).to(device)
+            encoded_input = tokenizer(text_batch, padding=True, truncation=True, return_tensors="pt").to(device)
             with torch.no_grad():
                 model_output = model(**encoded_input)
                 pooled_output = mean_pooling(
@@ -100,13 +92,11 @@ def process_task(context: zmq.Context):
             )
             results = []
             for i, vector in enumerate(vector_batch):
-                encoded_vector = base64.b64encode(
-                    vector.flatten().tobytes()
-                ).decode("utf-8")
+                encoded_vector = base64.b64encode(vector.flatten().tobytes()).decode("utf-8")
                 results.append(
                     {
                         "text": text_items[i].get("text", ""),
-                        "vector": encoded_vector,
+                        "dense_vector": encoded_vector,
                         "metadata": text_items[i].get("metadata", {}),
                     }
                 )
@@ -117,9 +107,7 @@ def process_task(context: zmq.Context):
             logger.exception("Error processing task.")
             response = {"error": str(e)}
 
-        socket.send_multipart(
-            [identity, b"", json.dumps(response).encode("utf-8")]
-        )
+        socket.send_multipart([identity, b"", json.dumps(response).encode("utf-8")])
 
 
 def inference_server():

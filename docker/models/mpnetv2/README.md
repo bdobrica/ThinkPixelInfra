@@ -14,16 +14,16 @@ The Embedding Model is a service that generates embeddings for a given input. It
 
 ## Weight Files
 
-The script downloads the weights for the model from the specified URL and saves them in the  weights  directory. The weights consist of the following files: 
+The script downloads the weights for the model from the specified URL and saves them in the  weights  directory. The weights consist of the following files:
 
-- `config.json` : The model configuration file 
-- `pytorch_model.bin` : The model weights 
-- `sentencepiece.bpe.model` : The SentencePiece BPE model 
-- `special_tokens_map.json` : Special tokens map 
-- `tokenizer_config.json` : Tokenizer configuration 
-- `tokenizer.json` : Tokenizer 
+- `config.json` : The model configuration file
+- `pytorch_model.bin` : The model weights
+- `sentencepiece.bpe.model` : The SentencePiece BPE model
+- `special_tokens_map.json` : Special tokens map
+- `tokenizer_config.json` : Tokenizer configuration
+- `tokenizer.json` : Tokenizer
 
-The script creates the  weights  directory if it doesn’t exist and then downloads each file to the appropriate subdirectory. 
+The script creates the  weights  directory if it doesn’t exist and then downloads each file to the appropriate subdirectory.
 
 ## Resources
 
@@ -54,7 +54,7 @@ Example response:
   "results": [
     {
       "text": "This is a very long piece of text ...",
-      "vector": "<base 64 encoded np.float32 array>",
+      "dense_vector": "<base 64 encoded np.float32 array>",
       "metadata": {
         "id": 1,
         "extra": {
