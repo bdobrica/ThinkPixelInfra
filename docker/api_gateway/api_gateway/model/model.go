@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"api_gateway/config"
 	"api_gateway/logger"
 )
 
@@ -47,7 +48,14 @@ type EmbeddingResponse struct {
 
 // GetEmbeddings retrieves embeddings for an array of text items
 func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	timeoutStr := config.GetEnv("API_GATEWAY_MODEL_TIMEOUT", "10s")
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		logger.Errorf("Failed to parse model timeout: %v", err)
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: timeout}
 
 	logger.Debugf("Using model %s", model)
 	logger.Debugf("Splitting text items into chunks of size %d with overlap %d", chunkSize, chunkOverlap)

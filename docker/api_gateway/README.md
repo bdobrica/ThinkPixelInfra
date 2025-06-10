@@ -15,6 +15,7 @@ The API Gateway is a RESTful API that serves as an entry point to the system. It
 - `API_GATEWAY_QDRANT_CLIENT_TTL`: Qdrant client TTL in cache, in seconds. Default: `3600`
 - `API_GATEWAY_VALIDATION_SUFFIX`: The suffix appended to `<domain><path>` to call for validation of registration request. Default: `wp-content/plugins/thinkpixel/rpc/validate/`
 - `API_GATEWAY_VALIDATION_TIMEOUT`: Timeout for validation request, as interval. Default: `5s`
+- `API_GATEWAY_MODEL_TIMEOUT`: Timeout for model request, as interval. Default: `10s`
 - `API_GATEWAY_VALIDATION_MAX_ATTEMPTS`: Number of retries for validation attempts. Default: `3`
 - `API_GATEWAY_LOG_FILE_PATH`: Log file path for requests. Default: `/var/log/requests.jsonl`
 - `API_GATEWAY_LOG_MAX_SIZE`: Maximum log file size, in bytes. Default: `10485760` (10MB)
@@ -61,7 +62,7 @@ The API Gateway is a RESTful API that serves as an entry point to the system. It
      |              |               |<-------------------------------------------| (results)
 (11) |              |<-Return list -|              |              |              |
 (12) | Replace WP loop & display results to User   |              |              |
-     |<-------------| (User sees search results)   |              |              | 
+     |<-------------| (User sees search results)   |              |              |
 ```
 
 1. User initiates a search via the Plugin.
@@ -142,16 +143,16 @@ Response:
 (6)   |                |                  |------------------------------------->| Forward pages to ML Model    |
       |                |                  |                   |                  | Generate embeddings          |
       |                |                  |                   |                  |----> (internally)            |
-      |                |                  |                   |                  |<---- (embeddings)            |         
+      |                |                  |                   |                  |<---- (embeddings)            |
       |                |                  |<-------------------------------------| Return embeddings            |
 (7)   |                |                  |----> Store pages + embeddings in ScyllaDB           |               |
 (8)   |                |                  | Store pages + embeddings in Redis    |              |               |
-      |                |                  |-------------------------------------------------------------------->|                       
+      |                |                  |-------------------------------------------------------------------->|
 (9)   |                |                  | Check RediSearch index (create if needed)           |               |
       |                |                  |-------------------------------------------------------------------->| Check index
       |                |                  |                   |                  |              |               |----> (internally)
       |                |                  |                   |                  |              |               |<---- (index)
-      |                |                  |<--------------------------------------------------------------------|               
+      |                |                  |<--------------------------------------------------------------------|
 (10)  |<----------------------------------| Return identifiers of stored pages   |              |               |
       |                |                  |                   |                  |              |               |
 (11)  | Update local MySQL DB to mark processed pages         |                  |              |               |
