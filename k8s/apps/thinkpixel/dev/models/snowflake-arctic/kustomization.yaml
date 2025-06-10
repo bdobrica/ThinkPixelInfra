@@ -28,7 +28,7 @@ patches:
         value: snowflake-arctic
       - op: replace
         path: /spec/selector/app.kubernetes.io~1name
-        value: snpowflake-arctic
+        value: snowflake-arctic
   - target:
       kind: PodDisruptionBudget
       name: .*

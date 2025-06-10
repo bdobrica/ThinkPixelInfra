@@ -5,7 +5,7 @@ metadata:
   name: api-gateway
   labels:
     app.kubernetes.io/component: api-gateway
-    app.kubernetes.io/version: 0.3.1
+    app.kubernetes.io/version: 0.1.0
 spec:
   replicas: 1
   selector:
