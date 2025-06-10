@@ -19,6 +19,9 @@ patches:
       - op: replace
         path: /spec/template/spec/topologySpreadConstraints/0/labelSelector/matchLabels/app.kubernetes.io~1name
         value: mpnetv2
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: quay.io/bdobrica/thinkpixel-mpnetv2-multi:0.1.8
   - target:
       kind: Service
       name: .*
