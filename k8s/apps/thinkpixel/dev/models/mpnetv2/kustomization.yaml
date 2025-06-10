@@ -21,7 +21,7 @@ patches:
         value: mpnetv2
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: quay.io/bdobrica/thinkpixel-mpnetv2-multi:0.1.8
+        value: quay.io/bdobrica/thinkpixel-mpnetv2-multi:0.2.0
   - target:
       kind: Service
       name: .*
