@@ -40,6 +40,8 @@ spec:
             - secretRef:
                 name: redis-secret
             - secretRef:
+                name: qdrant-secret
+            - secretRef:
                 name: mysql-secret
             - secretRef:
                 name: api-gateway-secret
@@ -48,6 +50,8 @@ spec:
               value: "$(API_GATEWAY_MYSQL_USER):$(MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
             - name: API_GATEWAY_REDIS_PASSWORD
               value: "$(REDIS_PASSWORD)"
+            - name: API_GATEWAY_QDRANT_API_KEY
+              value: "$(QDRANT__SERVICE__API_KEY)"
           resources:
             limits:
               memory: 512Mi
