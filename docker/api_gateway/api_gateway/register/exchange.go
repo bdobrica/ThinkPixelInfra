@@ -19,7 +19,7 @@ type APIKeyRequest struct {
 }
 
 type APIKeyResponse struct {
-	Success bool   `json:"success"`
+	Success string `json:"success"`
 	Message string `json:"message"`
 }
 
@@ -72,7 +72,7 @@ func triggerKeyExchange(domain, path, nonce string) error {
 		return fmt.Errorf("failed to decode key exchange response: %v", err)
 	}
 
-	if !apiKeyResponse.Success {
+	if apiKeyResponse.Success != "true" {
 		return fmt.Errorf("key exchange failed for %s: %s", url, apiKeyResponse.Message)
 	}
 
