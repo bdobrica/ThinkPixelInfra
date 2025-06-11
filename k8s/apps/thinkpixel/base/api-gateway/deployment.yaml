@@ -52,6 +52,8 @@ spec:
               value: "$(REDIS_PASSWORD)"
             - name: API_GATEWAY_QDRANT_API_KEY
               value: "$(QDRANT__SERVICE__API_KEY)"
+            - name: API_GATEWAY_MODEL_TIMEOUT
+              value: "30s"
           resources:
             limits:
               memory: 512Mi
