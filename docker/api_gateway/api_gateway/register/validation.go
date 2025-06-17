@@ -11,7 +11,6 @@ import (
 	"api_gateway/config"
 	"api_gateway/db"
 	"api_gateway/logger"
-	"strconv"
 )
 
 type ValidationResponse struct {
@@ -23,19 +22,9 @@ type ValidationResponse struct {
 
 func verifyDomain(domain, path, token string) {
 	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "?rest_route=/thinkpixel/v1/validate/")
-	timeoutStr := config.GetEnv("API_GATEWAY_VALIDATION_TIMEOUT", "5s")
-	timeout, err := time.ParseDuration(timeoutStr)
-	if err != nil {
-		logger.Fatalf("Failed to parse validation timeout: %v", err)
-		return
-	}
+	timeout := config.GetEnvDuration("API_GATEWAY_VALIDATION_TIMEOUT", 5*time.Second)
 
-	maxAttemptsStr := config.GetEnv("API_GATEWAY_VALIDATION_MAX_ATTEMPTS", "3")
-	maxAttemptsRaw, err := strconv.Atoi(maxAttemptsStr)
-	if err != nil || maxAttemptsRaw < 1 {
-		maxAttemptsRaw = 3 // Default to 3 attempts if invalid
-	}
-	maxAttempts := int32(maxAttemptsRaw)
+	maxAttempts := int32(config.GetEnvInt("API_GATEWAY_VALIDATION_MAX_ATTEMPTS", 3))
 
 	protocol := getUrlProtocol()
 	url := fmt.Sprintf("%s://%s%s%s", protocol, domain, path, validationSuffix)

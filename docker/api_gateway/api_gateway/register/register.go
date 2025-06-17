@@ -27,11 +27,7 @@ type RegisterResponse struct {
 }
 
 func getValidationTokenExpiry() (time.Time, error) {
-	verificationTokenExpiry := config.GetEnv("API_GATEWAY_VERIFICATION_TOKEN_EXPIRY", "5m")
-	expiryDuration, err := time.ParseDuration(verificationTokenExpiry)
-	if err != nil {
-		return time.Now(), fmt.Errorf("failed to parse verification token expiry duration: %s", err.Error())
-	}
+	expiryDuration := config.GetEnvDuration("API_GATEWAY_VERIFICATION_TOKEN_EXPIRY", 5*time.Minute)
 	return time.Now().Add(expiryDuration), nil
 }
 

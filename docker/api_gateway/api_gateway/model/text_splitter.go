@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// addOffsetToMetadata returns a copy of metadata with the "Offset" field set in Extra.
 func addOffsetToMetadata(metadata Metadata, offset int) Metadata {
 	newMetadata := Metadata{
 		ID:    metadata.ID,
@@ -18,7 +19,8 @@ func addOffsetToMetadata(metadata Metadata, offset int) Metadata {
 	return newMetadata
 }
 
-// splitText function splits a given text into chunks based on chunkSize and chunkOverlap
+// splitText splits a given text into chunks based on chunkSize and chunkOverlap.
+// Sentence boundaries are detected using a simple regular expression and may not handle all edge cases in natural language.
 func splitText(textItem TextItem, chunkSize, chunkOverlap int) []TextItem {
 	// Define sentence boundary characters
 	sentenceDelimiters := regexp.MustCompile(`[.!?\n]`)
@@ -69,7 +71,7 @@ func splitText(textItem TextItem, chunkSize, chunkOverlap int) []TextItem {
 				}
 				chunks = append(chunks, TextItem{sentence[start:end], addOffsetToMetadata(metadata, sentenceStart+start)})
 
-				// Move back by chunkOverlap and find a word boundary
+				// Move back to chunkOverlap and find a word boundary
 				start = end - chunkOverlap
 				if start < 0 {
 					start = 0
@@ -84,6 +86,7 @@ func splitText(textItem TextItem, chunkSize, chunkOverlap int) []TextItem {
 	return chunks
 }
 
+// splitTextItems splits a slice of TextItems into chunks using splitText.
 func splitTextItems(textItems []TextItem, chunkSize, chunkOverlap int) []TextItem {
 	var allChunks []TextItem
 

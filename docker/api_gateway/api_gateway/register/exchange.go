@@ -48,14 +48,8 @@ func triggerKeyExchange(domain, path, nonce string) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	timeOutStr := config.GetEnv("API_GATEWAY_KEY_EXCHANGE_TIMEOUT", "10s")
-	timeOut, err := time.ParseDuration(timeOutStr)
-	if err != nil {
-		return fmt.Errorf("failed to parse key exchange timeout: %v", err)
-	}
-	client := &http.Client{
-		Timeout: timeOut,
-	}
+	timeout := config.GetEnvDuration("API_GATEWAY_KEY_EXCHANGE_TIMEOUT", 10*time.Second)
+	client := &http.Client{Timeout: timeout}
 
 	resp, err := client.Do(req)
 	if err != nil {

@@ -182,11 +182,7 @@ func ActivateAPIKey(domain, path, apiKey string) error {
 		return err
 	}
 
-	validityStr := config.GetEnv("API_GATEWAY_API_KEY_VALIDITY", "720h")
-	validity, err := time.ParseDuration(validityStr)
-	if err != nil {
-		return fmt.Errorf("failed to parse API_GATEWAY_API_KEY_VALIDITY: %v", err)
-	}
+	validity := config.GetEnvDuration("API_GATEWAY_API_KEY_VALIDITY", 720*time.Hour) // Default to 30 days
 
 	hashedApiKey := utils.HashString(apiKey)
 	expiresAt := time.Now().Add(validity)
