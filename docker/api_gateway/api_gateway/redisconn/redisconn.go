@@ -25,8 +25,7 @@ type redisClientCacheEntry struct {
 var (
 	clientCache      sync.Map // Cache of Redis clients
 	sentinelPassword = config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
-	ttlFromEnv, _    = strconv.Atoi(config.GetEnv("API_GATEWAY_REDIS_CLIENT_TTL", "3600"))
-	clientCacheTTL   = time.Duration(ttlFromEnv) * time.Second
+	clientCacheTTL   = config.GetEnvDuration("API_GATEWAY_REDIS_CLIENT_TTL", 3600*time.Second)
 	clientCacheLock  sync.Mutex
 )
 

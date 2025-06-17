@@ -7,6 +7,7 @@ import (
 	"math"
 )
 
+// decodeBase64UInt32 decodes a base64-encoded big-endian uint32 string.
 func decodeBase64UInt32(encoded string) (uint32, error) {
 	// Decode the Base64 string
 	decodedBytes, err := base64.StdEncoding.DecodeString(encoded)
@@ -19,6 +20,7 @@ func decodeBase64UInt32(encoded string) (uint32, error) {
 	return binary.BigEndian.Uint32(decodedBytes), nil
 }
 
+// decodeBase64Float32 decodes a base64-encoded big-endian float32 string.
 func decodeBase64Float32(encoded string) (float32, error) {
 	// Decode the Base64 string
 	decodedBytes, err := base64.StdEncoding.DecodeString(encoded)
@@ -32,6 +34,8 @@ func decodeBase64Float32(encoded string) (float32, error) {
 	return math.Float32frombits(bitsValue), nil
 }
 
+// decodeFloatArray decodes a base64-encoded array of float32 values.
+// This expects the input to be big-endian, consistent with other decoders in this package.
 func decodeFloatArray(encoded string) ([]float32, error) {
 	// base64 decode
 	rawData, err := base64.StdEncoding.DecodeString(encoded)
@@ -49,13 +53,14 @@ func decodeFloatArray(encoded string) ([]float32, error) {
 	decoded := make([]float32, count)
 	for i := 0; i < count; i++ {
 		// slice out the 4 bytes for element i
-		bits := binary.LittleEndian.Uint32(rawData[i*4 : i*4+4])
+		bits := binary.BigEndian.Uint32(rawData[i*4 : i*4+4])
 		decoded[i] = math.Float32frombits(bits)
 	}
 
 	return decoded, nil
 }
 
+// decodeFloatMap decodes a map of base64-encoded uint32 keys and float32 values.
 func decodeFloatMap(encoded map[string]string) (map[int]float32, error) {
 	decoded := make(map[int]float32)
 

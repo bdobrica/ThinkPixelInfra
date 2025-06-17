@@ -3,7 +3,6 @@ package db
 import (
 	"api_gateway/config"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -30,11 +29,7 @@ func getIndexingNodeTypeById(siteId int) (string, error) {
 
 func AssignToIndexingNode(siteId int, requestedMemoryBytes uint64) error {
 	// Get the maximum memory allowed for the site from environment variable
-	siteMaxMemory := config.GetEnv("API_GATEWAY_SITE_MAX_MEMORY", "1000000000")
-	siteMaxMemoryBytes, err := strconv.ParseUint(siteMaxMemory, 10, 64)
-	if err != nil {
-		return fmt.Errorf("invalid site max memory %s: %w", siteMaxMemory, err)
-	}
+	siteMaxMemoryBytes := config.GetEnvByteSize("API_GATEWAY_SITE_MAX_MEMORY", 1_000_000_000)
 
 	// Check if the requested memory is within the allowed range
 	if requestedMemoryBytes < 1 || requestedMemoryBytes > siteMaxMemoryBytes {

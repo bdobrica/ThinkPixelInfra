@@ -26,8 +26,7 @@ type qdrantClientCacheEntry struct {
 var (
 	clientCache     sync.Map
 	qdrantApiKey    = config.GetEnv("API_GATEWAY_QDRANT_API_KEY", "")
-	ttlFromEnv, _   = strconv.Atoi(config.GetEnv("API_GATEWAY_QDRANT_CLIENT_TTL", "3600"))
-	clientCacheTTL  = time.Duration(ttlFromEnv) * time.Second
+	clientCacheTTL  = config.GetEnvDuration("API_GATEWAY_QDRANT_CLIENT_TTL", 3600*time.Second)
 	clientCacheLock sync.Mutex
 )
 

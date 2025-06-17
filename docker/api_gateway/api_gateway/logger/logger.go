@@ -1,9 +1,7 @@
 package logger
 
 import (
-	"fmt"
 	"log"
-	"strings"
 	"sync"
 
 	"api_gateway/config"
@@ -25,9 +23,8 @@ var (
 )
 
 func init() {
-	localEnv := fmt.Sprintf("%v", config.GetEnv("LOCAL", "false"))
-	lowerEnv := strings.ToLower(localEnv)
-	if lowerEnv == "true" || lowerEnv == "1" || lowerEnv == "yes" || lowerEnv == "on" {
+	localEnv := config.GetEnvBool("LOCAL", false)
+	if localEnv {
 		SetLogLevel(Debug)
 	}
 }

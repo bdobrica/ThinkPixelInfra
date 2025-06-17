@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -263,34 +262,14 @@ func init() {
 	// Read configuration from environment variables
 	// API_GATEWAY_LOG_FILE_PATH is now a template, e.g. "/var/log/requests-%s.jsonl"
 	fileTemplate := config.GetEnv("API_GATEWAY_LOG_FILE_PATH", "/var/log/api-gateway/requests-%s.jsonl")
-	maxSizeStr := config.GetEnv("API_GATEWAY_LOG_MAX_SIZE", "10485760")       // default 10 MB
-	maxFilesStr := config.GetEnv("API_GATEWAY_LOG_MAX_FILES", "5")            // default 5
-	bufferSizeStr := config.GetEnv("API_GATEWAY_LOG_BUFFER_SIZE", "100")      // default 100
-	flushIntervalStr := config.GetEnv("API_GATEWAY_LOG_FLUSH_INTERVAL", "60") // default 60 seconds
-
-	var (
-		maxSize    int64
-		maxFiles   int
-		bufferSize int
-	)
-
-	if v, err := strconv.ParseInt(maxSizeStr, 10, 64); err == nil {
-		maxSize = v
-	}
-	if v, err := strconv.Atoi(maxFilesStr); err == nil {
-		maxFiles = v
-	}
-	if v, err := strconv.Atoi(bufferSizeStr); err == nil {
-		bufferSize = v
-	}
-	flushIntervalSec := 60 // default value in seconds
-	if v, err := strconv.Atoi(flushIntervalStr); err == nil {
-		flushIntervalSec = v
-	}
+	maxSize := config.GetEnvInt64("API_GATEWAY_LOG_MAX_SIZE", 10_485_760)                    // default 10 MB
+	maxFiles := config.GetEnvInt("API_GATEWAY_LOG_MAX_FILES", 5)                             // default 5
+	bufferSize := config.GetEnvInt("API_GATEWAY_LOG_BUFFER_SIZE", 100)                       // default 100
+	flushInterval := config.GetEnvDuration("API_GATEWAY_LOG_FLUSH_INTERVAL", 60*time.Second) // default 60 seconds
 
 	// Create the logger using the file template.
 	var err error
-	RLogger, err = NewLogger(fileTemplate, maxSize, maxFiles, bufferSize, time.Duration(flushIntervalSec)*time.Second)
+	RLogger, err = NewLogger(fileTemplate, maxSize, maxFiles, bufferSize, flushInterval)
 	if err != nil {
 		// Errorf is assumed to be a helper that logs errors.
 		Errorf("Failed to create request logger: %v", err)
