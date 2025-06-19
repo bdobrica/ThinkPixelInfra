@@ -5,6 +5,5 @@ onnxruntime[cpu]
 pyyaml
 pyzmq
 spacy
-spacy
 transformers
 uvicorn

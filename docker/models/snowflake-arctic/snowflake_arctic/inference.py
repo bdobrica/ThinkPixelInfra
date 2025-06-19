@@ -62,27 +62,19 @@ def process_task(context: zmq.Context):
             data = json.loads(request)
             text_items = data.get("text_items", [])
 
-            logger.debug(
-                "Received %s text items for inference.", len(text_items)
-            )
+            logger.debug("Received %s text items for inference.", len(text_items))
 
             batch_text = [item.get("text", "") for item in text_items]
 
             # Batch encode and process with the model
             logger.debug("Processing %s chunks...", len(batch_text))
-            batch_input = tokenizer(
-                batch_text, padding=True, truncation=True, return_tensors="np"
-            )
-            batch_tokens = map(
-                tokenizer.convert_ids_to_tokens, batch_input.input_ids
-            )
+            batch_input = tokenizer(batch_text, padding=True, truncation=True, return_tensors="np")
+            batch_tokens = map(tokenizer.convert_ids_to_tokens, batch_input.input_ids)
             model_output = session.run(
                 None,
                 {
                     "input_ids": batch_input.input_ids.astype("int64"),
-                    "attention_mask": batch_input.attention_mask.astype(
-                        "int64"
-                    ),
+                    "attention_mask": batch_input.attention_mask.astype("int64"),
                 },
             )
             batch_dense_vectors = model_output[0]
@@ -103,11 +95,14 @@ def process_task(context: zmq.Context):
                 results.append(
                     {
                         "text": text_item.get("text", ""),
-                        "dense_vector": base64.b64encode(
-                            dense_vector.flatten().tobytes()
-                        ).decode("utf-8"),
-                        "sparse_vector": sparse_vector,
-                        "metadata": text_item.get("metadata", {}),
+                        "dense_vector": base64.b64encode(dense_vector.flatten().astype(">f4").tobytes()).decode(
+                            "utf-8"
+                        ),
+                        "sparse_vector": sparse_vector.to_dict(),
+                        "metadata": {
+                            **text_item.get("metadata", {}),
+                            "language": sparse_vector.language,
+                        },
                     }
                 )
 
@@ -117,9 +112,7 @@ def process_task(context: zmq.Context):
             logger.exception("Error processing task.")
             response = {"error": str(e)}
 
-        socket.send_multipart(
-            [identity, b"", json.dumps(response).encode("utf-8")]
-        )
+        socket.send_multipart([identity, b"", json.dumps(response).encode("utf-8")])
 
 
 def inference_server():

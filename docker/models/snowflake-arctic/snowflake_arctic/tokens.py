@@ -1,9 +1,9 @@
 from functools import reduce
-from typing import Dict, Iterable, List, Tuple
+from typing import Iterable, List, Tuple
 
 import numpy as np
 
-from .language import build_sparse_vector
+from .sparse_vector import SparseVector
 
 WeightedToken = Tuple[str, float]
 
@@ -30,9 +30,7 @@ def _keep_token(x: str, _: np.ndarray) -> bool:
     return x not in {"<s>", "</s>", "<pad>", "<unk>"}
 
 
-def _reduce_tokens(
-    res: List[WeightedToken], y: Tuple[str, np.ndarray]
-) -> List[WeightedToken]:
+def _reduce_tokens(res: List[WeightedToken], y: Tuple[str, np.ndarray]) -> List[WeightedToken]:
     """Helper function to reduce tokens/weights zips."""
     if _keep_token(*y):
         if _is_partial(*y):
@@ -43,9 +41,7 @@ def _reduce_tokens(
     return res
 
 
-def build_batch_sparse_vectors(
-    tokens: Iterable[List[str]], weights: np.ndarray
-) -> List[Dict[str, str]]:
+def build_batch_sparse_vectors(tokens: Iterable[List[str]], weights: np.ndarray) -> List[SparseVector]:
     """
     Map tokens to weights.
 
@@ -59,9 +55,7 @@ def build_batch_sparse_vectors(
     """
     return list(
         map(
-            lambda tw: build_sparse_vector(
-                *zip(*reduce(_reduce_tokens, tw, []))
-            ),
+            lambda tw: SparseVector(*zip(*reduce(_reduce_tokens, tw, []))),
             map(lambda item: zip(*item), zip(tokens, weights)),
         )
     )
