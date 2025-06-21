@@ -36,3 +36,7 @@ secret.yaml
 !*-sealed-secret.yaml
 *-secrets.yaml
 !*-sealed-secrets.yaml
+
+# Ignore Python specific files
+__pycache__/
+*.py[cod]

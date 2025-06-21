@@ -92,7 +92,7 @@ def process_task(context: zmq.Context):
             )
             results = []
             for i, vector in enumerate(vector_batch):
-                encoded_vector = base64.b64encode(vector.flatten().tobytes()).decode("utf-8")
+                encoded_vector = base64.b64encode(vector.flatten().astype(">f4").tobytes()).decode("utf-8")
                 results.append(
                     {
                         "text": text_items[i].get("text", ""),
