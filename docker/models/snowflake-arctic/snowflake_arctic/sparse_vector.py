@@ -57,7 +57,7 @@ class SparseVector:
             elapsed_time,
         )
 
-        if score > 0.33:
+        if score > 0.2:
             return lang
 
         return "unk"  # fallback to unknown if score is low

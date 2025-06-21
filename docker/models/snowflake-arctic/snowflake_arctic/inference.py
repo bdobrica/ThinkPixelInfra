@@ -92,6 +92,7 @@ def process_task(context: zmq.Context):
                 batch_dense_vectors,
                 batch_sparse_vectors,
             ):
+                metadata = text_item.get("metadata", {})
                 results.append(
                     {
                         "text": text_item.get("text", ""),
@@ -100,8 +101,11 @@ def process_task(context: zmq.Context):
                         ),
                         "sparse_vector": sparse_vector.to_dict(),
                         "metadata": {
-                            **text_item.get("metadata", {}),
-                            "language": sparse_vector.language,
+                            **metadata,
+                            "extra": {
+                                **metadata.get("extra", {}),
+                                "language": sparse_vector.language,
+                            },
                         },
                     }
                 )

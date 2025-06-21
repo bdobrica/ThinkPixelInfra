@@ -57,6 +57,8 @@ class UnknownLanguage(spacy.language.Language):
             raise ValueError("Input must be a string or a spaCy Doc.")
 
         for token in doc:
+            lemma = self._get_lemma(token.text)
+            token.lemma = self.vocab.strings[lemma]
             token.lex.is_punct = self._is_punct(token.text)
         return doc
 
