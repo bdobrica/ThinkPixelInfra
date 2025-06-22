@@ -24,12 +24,20 @@ func initHTTPClient() (*http.Client, error) {
 
 // truncateForLogging truncates an object to a string representation suitable for logging.
 func truncateForLogging(o any) string {
-	objectStr := fmt.Sprintf("%v", o)
-	enableDebugging := config.GetEnvBool("LOCAL", true)
-	if enableDebugging || len(objectStr) <= 256 {
-		return objectStr // No truncation in debug mode
+	var oString string
+
+	oBytes, err := json.Marshal(o)
+	if err != nil {
+		oString = fmt.Sprintf("%v", o) // Fallback to default string representation
+	} else {
+		oString = string(oBytes)
 	}
-	return objectStr[:250] + "..." + objectStr[len(objectStr)-3:]
+
+	enableDebugging := config.GetEnvBool("LOCAL", true)
+	if enableDebugging || len(oString) <= 256 {
+		return oString // No truncation in debug mode
+	}
+	return oString[:250] + "..." + oString[len(oString)-3:]
 }
 
 // callModelAPI sends a batch of TextItems to the model API and decodes the response.
@@ -133,37 +141,21 @@ func decodeInferenceResponse(inferenceResponse InferenceResponse, embeddingsResp
 	return nil
 }
 
-// GetEmbeddings retrieves embeddings for an array of text items using the specified model.
-func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
-	// Initialize HTTP client
-	client, err := initHTTPClient()
-	if err != nil {
-		logger.Errorf("Failed to initialize HTTP client: %v", err)
-		return nil, err
-	}
-
+func callModelAPIWithQueue(client *http.Client, model string, textItems []TextItem, embeddingsResponses *[]EmbeddingResponse) error {
 	// Initialize inference queue
 	queueAny := queuePool.Get()
 	if queueAny == nil {
-		return nil, fmt.Errorf("failed to obtain inference queue from pool")
+		return fmt.Errorf("failed to obtain inference queue from pool")
 	}
 	queue := queueAny.(*inference_queue.InferenceQueue[TextItem])
 	defer func() {
-		err = queue.Reset()
+		err := queue.Reset()
 		if err != nil {
 			logger.Errorf("Error resetting inference queue: %v", err)
 		}
 		queuePool.Put(queue)
 	}()
-
-	logger.Debugf("Using model %s", model)
-	logger.Debugf("Splitting text items into chunks of size %d with overlap %d", chunkSize, chunkOverlap)
-
-	splitItems := splitTextItems(textItems, chunkSize, chunkOverlap)
-	queue.PushBatch(splitItems)
-
-	// Process the queue and call the model API
-	embeddings := make([]EmbeddingResponse, 0)
+	queue.PushBatch(textItems)
 
 	for {
 		batch, err := queue.GetBatch()
@@ -172,7 +164,7 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 				break // No more batches to process
 			}
 			logger.Errorf("Error popping batch from queue: %v", err)
-			return nil, err
+			return err
 		}
 		if len(batch) == 0 {
 			logger.Debugf("No items in batch, skipping")
@@ -182,16 +174,67 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 		inferenceResponse, err := callModelAPIWithRetry(client, model, batch)
 		if err != nil {
 			logger.Errorf("Error calling model API: %v", err)
-			return nil, err
+			return err
 		}
 		// Log the latency of the inference response
 		logger.Debugf("Model API response latency: %.2f ms", inferenceResponse.Latency*1000)
 		// Decode the inference response and append to embeddings
-		if err := decodeInferenceResponse(*inferenceResponse, &embeddings); err != nil {
+		if err := decodeInferenceResponse(*inferenceResponse, embeddingsResponses); err != nil {
 			logger.Errorf("Error decoding inference response: %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func callModelAPIWithoutQueue(client *http.Client, model string, textItems []TextItem, embeddingsResponses *[]EmbeddingResponse) error {
+	// Process the text items directly without using a queue
+	inferenceResponse, err := callModelAPIWithRetry(client, model, textItems)
+	if err != nil {
+		logger.Errorf("Error calling model API: %v", err)
+		return err
+	}
+	// Log the latency of the inference response
+	logger.Debugf("Model API response latency: %.2f ms", inferenceResponse.Latency*1000)
+	// Decode the inference response and append to embeddings
+	if err := decodeInferenceResponse(*inferenceResponse, embeddingsResponses); err != nil {
+		logger.Errorf("Error decoding inference response: %v", err)
+		return err
+	}
+	return nil
+}
+
+// GetEmbeddings retrieves embeddings for an array of text items using the specified model.
+func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
+	// Initialize HTTP client
+	client, err := initHTTPClient()
+	if err != nil {
+		logger.Errorf("Failed to initialize HTTP client: %v", err)
+		return nil, err
+	}
+
+	logger.Debugf("Using model %s", model)
+	logger.Debugf("Splitting text items into chunks of size %d with overlap %d", chunkSize, chunkOverlap)
+
+	splitItems := splitTextItems(textItems, chunkSize, chunkOverlap)
+
+	// Process the queue and call the model API
+	embeddings := make([]EmbeddingResponse, 0)
+
+	if len(splitItems) > batchMaxSize {
+		logger.Debugf("Using inference queue for model %s", model)
+		if err := callModelAPIWithQueue(client, model, splitItems, &embeddings); err != nil {
+			logger.Errorf("Error processing with inference queue: %v", err)
+			return nil, err
+		}
+	} else {
+		logger.Debugf("Processing text items directly without queue for model %s", model)
+		if err := callModelAPIWithoutQueue(client, model, splitItems, &embeddings); err != nil {
+			logger.Errorf("Error processing without inference queue: %v", err)
 			return nil, err
 		}
 	}
 
+	logger.Debugf("Retrieved %d embeddings for model %s", len(embeddings), model)
 	return embeddings, nil
 }

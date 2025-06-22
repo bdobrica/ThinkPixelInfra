@@ -194,6 +194,7 @@ func SearchEmbeddings(siteID int, indexingNode string, embeddings []model.Embedd
 	// collect all ranked lists
 	results := []map[string]interface{}{}
 	for _, e := range embeddings {
+		queryStartTime := time.Now()
 		searchResults, err := client.Query(ctx, &qdrant.QueryPoints{
 			CollectionName: indexName,
 			Prefetch: []*qdrant.PrefetchQuery{
@@ -215,14 +216,17 @@ func SearchEmbeddings(siteID int, indexingNode string, embeddings []model.Embedd
 			Limit:       qdrant.PtrOf(uint64(limit)),
 			WithPayload: qdrant.NewWithPayloadInclude("post_id", "text"),
 		})
+		logger.Debugf("Search for embedding %d took %s", e.ID, time.Since(queryStartTime))
 
 		if err != nil {
 			if se, ok := status.FromError(err); ok && se.Code() == codes.NotFound {
 				logger.Errorf("Collection %s not found: %v", indexName, err)
 				return nil, fmt.Errorf("collection %s not found: %w", indexName, err)
 			}
+			logger.Errorf("Failed to query Qdrant: %v", err)
 			return nil, fmt.Errorf("failed to query Qdrant: %w", err)
 		}
+		logger.Debugf("Search for embedding %d returned %d results", e.ID, len(searchResults))
 
 		for _, searchResult := range searchResults {
 			if searchResult.Id == nil {
@@ -239,14 +243,13 @@ func SearchEmbeddings(siteID int, indexingNode string, embeddings []model.Embedd
 		}
 	}
 
-	// fuse with RRF (K=60 is common) :contentReference[oaicite:4]{index=4}
-
 	// Sort results by score and return top N
 	sort.Slice(results, func(i, j int) bool {
 		return results[i]["score"].(float32) > results[j]["score"].(float32)
 	})
 
 	if len(results) > limit {
+		logger.Debugf("Limiting results to %d", limit)
 		results = results[:limit]
 	}
 
