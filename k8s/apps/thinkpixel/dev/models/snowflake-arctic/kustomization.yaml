@@ -21,7 +21,7 @@ patches:
         value: snowflake-arctic
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: quay.io/bdobrica/thinkpixel-snowflake-arctic-multi:0.1.4
+        value: quay.io/bdobrica/thinkpixel-snowflake-arctic-multi:0.1.5
   - target:
       kind: Service
       name: .*
