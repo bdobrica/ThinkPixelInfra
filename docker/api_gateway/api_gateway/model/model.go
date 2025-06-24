@@ -152,6 +152,8 @@ func callModelAPIWithQueue(client *http.Client, model string, textItems []TextIt
 		err := queue.Reset()
 		if err != nil {
 			logger.Errorf("Error resetting inference queue: %v", err)
+			_ = queue.Close() // Ensure the queue is closed on error and is not reused
+			return
 		}
 		queuePool.Put(queue)
 	}()
