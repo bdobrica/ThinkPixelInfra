@@ -35,15 +35,20 @@ class UnknownLanguage(spacy.language.Language):
         self.vocab = Vocab()
 
     def _is_punct(self, token: str) -> bool:
-        return all(unicodedata.category(item)[0] in "PMSC" for item in token)
+        # List of Unicode categories that are considered punctuation
+        # https://en.wikipedia.org/wiki/Template:General_Category_(Unicode)
+        return all(unicodedata.category(item)[0] in "MPSZC" for item in token)
 
     def _get_lemma(self, token: str) -> str:
         token = token.strip().lower()
-        while token and unicodedata.category(token[0]) in "PMSC":
+        # Remove leading and trailing punctuation characters
+        while token and unicodedata.category(token[0])[0] in "MPSZC":
             token = token[1:]
-        while token and unicodedata.category(token[-1]) in "PMSC":
+        while token and unicodedata.category(token[-1])[0] in "MPSZC":
             token = token[:-1]
-        return token or "<unk>"
+        token = token or "<unk>"
+        self.vocab.strings.add(token)
+        return token
 
     def __call__(self, text: Union[str, Doc], **kwargs) -> Doc:
         doc: Doc
