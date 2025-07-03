@@ -25,6 +25,7 @@ func main() {
 
 	// Protected Routes
 	r.Handle("/store", middleware.JWTMiddleware(middleware.LoggingMiddleware(http.HandlerFunc(handlers.StoreHandler)))).Methods("POST")
+	r.Handle("/store/max_batch_text_size", middleware.JWTMiddleware(http.HandlerFunc(handlers.MaxBatchTextSizeHandler))).Methods("POST")
 	r.Handle("/search", middleware.JWTMiddleware(http.HandlerFunc(handlers.SearchHandler))).Methods("POST")
 	r.Handle("/remove/embedding", middleware.JWTMiddleware(middleware.LoggingMiddleware(http.HandlerFunc(handlers.RemoveEmbeddingsHandler)))).Methods("POST")
 	r.Handle("/remove/embeddings", middleware.JWTMiddleware(middleware.LoggingMiddleware(http.HandlerFunc(handlers.RemoveMultipleEmbeddingsHandler)))).Methods("POST")

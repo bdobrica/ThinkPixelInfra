@@ -21,6 +21,13 @@ type StoreRequest []struct {
 	Extra map[string]string `json:"extra,omitempty"`
 }
 
+type StoreResponse struct {
+	ReceivedTexts   int    `json:"received_texts"`
+	StoredDocuments int    `json:"stored_documents"`
+	StoredIDs       []int  `json:"stored_ids,omitempty"`
+	Timestamp       string `json:"timestamp"`
+}
+
 type StoreCallback func([]model.EmbeddingResponse) (int, error)
 
 func getStoreCallback(cacheEntry auth.CacheEntry) (StoreCallback, error) {
@@ -40,6 +47,7 @@ func getStoreCallback(cacheEntry auth.CacheEntry) (StoreCallback, error) {
 
 // StoreHandler handles storing webpage data
 func StoreHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: Remember to soft-fail, i.e. if at least one item is stored, return success even if some fail, but log the errors and return them in the response
 	// Retrieve CacheEntry from context
 	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
@@ -49,20 +57,20 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debugf("CacheEntry %+v", cacheEntry)
 
 	// Parse input
-	var input StoreRequest
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req StoreRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
-	if len(input) == 0 {
-		utils.RespondWithError(w, http.StatusBadRequest, "Input must contain at least one item")
+	if len(req) == 0 {
+		utils.RespondWithError(w, http.StatusBadRequest, "Request must contain at least one item")
 		return
 	}
 
 	// Prepare TextItems for model inference
-	textItems := make([]model.TextItem, len(input))
-	for i, item := range input {
+	textItems := make([]model.TextItem, len(req))
+	for i, item := range req {
 		textItems[i] = model.TextItem{
 			Text: item.Text,
 			Metadata: model.Metadata{
@@ -100,11 +108,18 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Send summary back as JSON
-		utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
-			"received_texts":   len(input),
-			"stored_documents": storedCount,
-			"timestamp":        time.Now().Format(time.RFC3339),
+		// Prepare response
+		storedIDs := make([]int, len(embeddings))
+		for i, emb := range embeddings {
+			storedIDs[i] = emb.ID
+		}
+		logger.Infof("Stored %d documents for site ID %d", storedCount, cacheEntry.ID)
+
+		_ = utils.RespondWithJSON(w, http.StatusOK, StoreResponse{
+			ReceivedTexts:   len(req),
+			StoredDocuments: storedCount,
+			StoredIDs:       storedIDs,
+			Timestamp:       time.Now().Format(time.RFC3339),
 		})
 	case err := <-errChan:
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving embeddings: "+err.Error())

@@ -18,7 +18,19 @@ type RemoveEmbeddingRequest struct {
 	Offset int    `json:"offset"`
 }
 
+type RemoveEmbeddingResponse struct {
+	Message string `json:"message"`
+	ID      string `json:"id"`
+	Offset  int    `json:"offset"`
+}
+
 type RemoveMultipleEmbeddingsByOffsetRequest struct {
+	ID      string `json:"id"`
+	Offsets []int  `json:"offsets"`
+}
+
+type RemoveMultipleEmbeddingsByOffsetResponse struct {
+	Message string `json:"message"`
 	ID      string `json:"id"`
 	Offsets []int  `json:"offsets"`
 }
@@ -70,8 +82,11 @@ func RemoveEmbeddingByOffsetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Embedding removed successfully"))
+	_ = utils.RespondWithJSON(w, http.StatusOK, RemoveEmbeddingResponse{
+		Message: "Embedding removed successfully",
+		ID:      req.ID,
+		Offset:  req.Offset,
+	})
 }
 
 func RemoveMultipleEmbeddingsByOffsetHandler(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +122,9 @@ func RemoveMultipleEmbeddingsByOffsetHandler(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Embeddings removed successfully"))
+	_ = utils.RespondWithJSON(w, http.StatusOK, RemoveMultipleEmbeddingsByOffsetResponse{
+		Message: "Embeddings removed successfully",
+		ID:      req.ID,
+		Offsets: req.Offsets,
+	})
 }

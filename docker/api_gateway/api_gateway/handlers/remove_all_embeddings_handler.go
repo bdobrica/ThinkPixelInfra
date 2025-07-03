@@ -17,8 +17,18 @@ type RemoveAllEmbeddingsRequest struct {
 	ID string `json:"id"`
 }
 
+type RemoveAllEmbeddingsResponse struct {
+	Message string `json:"message"`
+	ID      string `json:"id"`
+}
+
 type RemoveMultipleEmbeddingsRequest struct {
 	IDs []string `json:"ids"`
+}
+
+type RemoveMultipleEmbeddingsResponse struct {
+	Message string   `json:"message"`
+	IDs     []string `json:"ids"`
 }
 
 type RemoveAllEmbeddingsCallback func(string) error
@@ -68,8 +78,11 @@ func RemoveEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Embeddings removed successfully"))
+	// Respond with success message
+	_ = utils.RespondWithJSON(w, http.StatusOK, RemoveAllEmbeddingsResponse{
+		Message: "Embeddings removed successfully",
+		ID:      req.ID,
+	})
 }
 
 func RemoveMultipleEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +119,9 @@ func RemoveMultipleEmbeddingsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Embeddings removed successfully"))
+	// Respond with success message
+	_ = utils.RespondWithJSON(w, http.StatusOK, RemoveMultipleEmbeddingsResponse{
+		Message: "Embeddings removed successfully",
+		IDs:     req.IDs,
+	})
 }

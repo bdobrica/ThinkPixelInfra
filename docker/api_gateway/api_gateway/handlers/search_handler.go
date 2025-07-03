@@ -17,7 +17,10 @@ import (
 
 type SearchRequest struct {
 	Text string `json:"text"`
-	ID   int    `json:"id"`
+}
+
+type SearchResponse struct {
+	Results []map[string]interface{} `json:"results"`
 }
 
 type SearchCallback func([]model.EmbeddingResponse) ([]map[string]interface{}, error)
@@ -48,22 +51,22 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debugf("CacheEntry %+v", cacheEntry)
 
 	// Parse input
-	var input SearchRequest
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	var req SearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
-	if input.Text == "" {
+	if req.Text == "" {
 		utils.RespondWithError(w, http.StatusBadRequest, "Text field is required")
 		return
 	}
 
 	// Prepare TextItem for model inference
 	textItem := model.TextItem{
-		Text: input.Text,
+		Text: req.Text,
 		Metadata: model.Metadata{
-			ID: input.ID,
+			ID: 0, // ID is not used for search, but can be set if needed
 		},
 	}
 
@@ -71,7 +74,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	embeddingChan := make(chan []model.EmbeddingResponse)
 	errChan := make(chan error)
 	go func() {
-		embeddings, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, len(input.Text), 0)
+		embeddings, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, len(req.Text), 0)
 		if err != nil {
 			errChan <- err
 			return
@@ -96,7 +99,9 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send results back as JSON
-		utils.RespondWithJSON(w, http.StatusOK, map[string]interface{}{"results": results})
+		_ = utils.RespondWithJSON(w, http.StatusOK, SearchResponse{
+			Results: results,
+		})
 	case err := <-errChan:
 		utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving embedding: "+err.Error())
 	case <-time.After(10 * time.Second):

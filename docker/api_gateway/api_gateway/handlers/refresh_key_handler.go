@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"api_gateway/db"
@@ -29,9 +28,7 @@ func RefreshAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := RefreshAPIKeyResponse{
+	_ = utils.RespondWithJSON(w, 200, RefreshAPIKeyResponse{
 		APIKey: newApiKey,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	})
 }
