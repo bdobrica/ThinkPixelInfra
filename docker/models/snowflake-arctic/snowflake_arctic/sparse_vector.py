@@ -1,5 +1,6 @@
 import base64
 import logging
+import re
 import time
 from struct import pack
 from typing import Dict, Iterable
@@ -18,6 +19,8 @@ class SparseVector:
     """
     Represents a sparse vector with tokens and their weights.
     """
+
+    LANG_DETECT_MAX_LENGTH = 100
 
     @staticmethod
     def _base64_uint(x: int) -> str:
@@ -39,13 +42,22 @@ class SparseVector:
         self.weights = weights
         self.language = self._detect_language(" ".join(self.tokens))
 
+    def _prepare_text_for_language_detection(self, text: str) -> str:
+        text_ = re.sub(r"\s+", " ", text.lower().strip())
+        text_ = text_[: self.LANG_DETECT_MAX_LENGTH]
+        last_space_pos = text_.rfind(" ")
+        if last_space_pos != -1:
+            text_ = text_[:last_space_pos]
+        return text_
+
     def _detect_language(self, text: str) -> str:
         """
         Detects the language of the given text.
         Expects fast_langdetect.detect to return a dict with 'lang' and 'score'.
         """
         start_time = time.perf_counter()
-        result = detect(text)
+        text_ = self._prepare_text_for_language_detection(text)
+        result = detect(text_)
         elapsed_time = time.perf_counter() - start_time
         score = float(result.get("score", 0))
         lang = str(result.get("lang", "unk"))
