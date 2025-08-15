@@ -11,6 +11,9 @@ spec:
       environment: dev
     - tenant: thinkpixel
       environment: dev
+    - tenant: cert-manager
+      environment: dev
+      privileged: true
   resources:
     - apiVersion: v1
       kind: Namespace
@@ -47,7 +50,7 @@ spec:
         name: << inputs.tenant >>-<< inputs.environment >>
         namespace: flux-system
       spec:
-        targetNamespace: << inputs.tenant >>
+        targetNamespace: << get inputs "privileged" | default false | ternary "flux-system" inputs.tenant >>
         serviceAccountName: flux-operator
         interval: 30m
         retryInterval: 5m
