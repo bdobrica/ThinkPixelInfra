@@ -11,8 +11,6 @@ spec:
       environment: dev
     - tenant: thinkpixel
       environment: dev
-    - tenant: cert-manager
-      environment: dev
   resources:
     - apiVersion: v1
       kind: Namespace
