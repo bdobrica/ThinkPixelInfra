@@ -1,7 +1,7 @@
 apiVersion: fluxcd.controlplane.io/v1
 kind: ResourceSet
 metadata:
-  name: apps
+  name: git-apps
   namespace: flux-system
   annotations:
     fluxcd.controlplane.io/reconcileEvery: "5m"
