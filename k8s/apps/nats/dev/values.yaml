@@ -1,0 +1,10 @@
+# Core only
+config:
+  jetstream:
+    enabled: false
+  cluster:
+    enabled: false
+service:
+  type: ClusterIP
+natsbox:
+  enabled: true
