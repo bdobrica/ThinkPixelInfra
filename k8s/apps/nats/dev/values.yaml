@@ -1,0 +1,30 @@
+# Core only
+tlsCA:
+  enabled: true
+  secretName: nats-tls-secret
+config:
+  jetstream:
+    enabled: false
+  cluster:
+    enabled: false
+  nats:
+    tls:
+      enabled: true
+      secretName: nats-tls-secret
+  merge:
+    authorization:
+      users:
+        - nkey: UDFMYYFHYUWB45ZERYKFE4PBXSJZ4UAYQ7YBI3L64F6K4MCLUEJHKKEZ
+service:
+  type: ClusterIP
+natsBox:
+  enabled: true
+  contexts:
+    default:
+      nkey:
+        secretName: nats-nkey-secret
+      tls:
+        enabled: true
+        secretName: nats-tls-secret
+      merge:
+        url: nats://nats.nats.svc.${CLUSTER_DOMAIN}:4222

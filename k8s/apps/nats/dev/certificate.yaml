@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nats
+spec:
+  secretName: nats-tls-secret
+  issuerRef:
+    name: nats
+    kind: Issuer
+  commonName: nats.nats.svc.${CLUSTER_DOMAIN}
+  dnsNames:
+    - nats.nats.svc.${CLUSTER_DOMAIN}
+  usages:
+    - server auth
+    - client auth
