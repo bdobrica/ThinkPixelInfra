@@ -1,4 +1,4 @@
-package inference_queue
+package model_queue
 
 import (
 	"bufio"
@@ -18,8 +18,8 @@ type QueueItem[T any] struct {
 	Size int64 // Size in bytes of the marshaled item
 }
 
-// InferenceQueue implements a queue for items with in-memory and disk-spill capabilities.
-type InferenceQueue[T any] struct {
+// ModelQueue implements a queue for items with in-memory and disk-spill capabilities.
+type ModelQueue[T any] struct {
 	mu                 sync.Mutex     // Mutex for protecting access to queue fields
 	inMemoryQueue      []QueueItem[T] // In-memory buffer for items
 	currentMemoryBytes atomic.Int64   // Current byte size of items in inMemoryQueue
@@ -44,15 +44,15 @@ type InferenceQueue[T any] struct {
 	isClosed atomic.Bool // Flag to indicate if the queue is being closed
 }
 
-// NewInferenceQueue creates and initializes a new InferenceQueue.
+// NewModelQueue creates and initializes a new ModelQueue.
 // maxMemoryBytes: The maximum memory (in bytes) to use before spilling to a temporary file.
 // maxBatchSize: The maximum number of items to return in a single GetBatch call.
-func NewInferenceQueue[T any](maxMemoryBytes int64, maxBatchSize int) (*InferenceQueue[T], error) {
+func NewModelQueue[T any](maxMemoryBytes int64, maxBatchSize int) (*ModelQueue[T], error) {
 	if maxMemoryBytes <= 0 || maxBatchSize <= 0 {
 		return nil, fmt.Errorf("maxMemoryBytes and maxBatchSize must be positive")
 	}
 
-	q := &InferenceQueue[T]{
+	q := &ModelQueue[T]{
 		inMemoryQueue:  make([]QueueItem[T], 0),
 		maxMemoryBytes: maxMemoryBytes,
 		maxBatchSize:   maxBatchSize,
@@ -60,7 +60,7 @@ func NewInferenceQueue[T any](maxMemoryBytes int64, maxBatchSize int) (*Inferenc
 	q.cond = sync.NewCond(&q.mu)
 
 	// Create the initial temporary file for potential spills
-	file, err := os.CreateTemp("", "inference-queue-*.tmp")
+	file, err := os.CreateTemp("", "model-queue-*.tmp")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -75,7 +75,7 @@ func NewInferenceQueue[T any](maxMemoryBytes int64, maxBatchSize int) (*Inferenc
 // waitForItemsOrShutdown blocks until there are items available in the queue or the queue is closed.
 // It checks the total queued items and the closed state of the queue.
 // Returns io.EOF if the queue is closed and empty, indicating no more items will arrive.
-func (q *InferenceQueue[T]) waitForItemsOrShutdown() error {
+func (q *ModelQueue[T]) waitForItemsOrShutdown() error {
 	// Wait if the queue is empty AND not closed.
 	// This makes the consumer block until items are available or the queue is explicitly closed.
 	for q.totalQueuedItems.Load() == 0 && !q.isClosed.Load() {
@@ -95,7 +95,7 @@ func (q *InferenceQueue[T]) waitForItemsOrShutdown() error {
 // This function is called by GetBatch to prioritize in-memory items before reading from disk.
 // It modifies the provided batch slice directly.
 // It also updates the current memory usage and total queued items accordingly.
-func (q *InferenceQueue[T]) consumeFromMemory(batch *[]T) {
+func (q *ModelQueue[T]) consumeFromMemory(batch *[]T) {
 	// Consume items from in-memory queue until batch is full or memory is exhausted
 	for i := 0; i < q.maxBatchSize && len(q.inMemoryQueue) > 0; i++ {
 		item := q.inMemoryQueue[0]
@@ -108,7 +108,7 @@ func (q *InferenceQueue[T]) consumeFromMemory(batch *[]T) {
 	}
 }
 
-func (q *InferenceQueue[T]) consumeFromDisk(batch *[]T) error {
+func (q *ModelQueue[T]) consumeFromDisk(batch *[]T) error {
 	// Now, if q.reader is not nil (either was already active, or just became active above)
 	if q.reader == nil {
 		return nil
@@ -157,7 +157,7 @@ func (q *InferenceQueue[T]) consumeFromDisk(batch *[]T) error {
 	return nil
 }
 
-func (q *InferenceQueue[T]) prepareReader() error {
+func (q *ModelQueue[T]) prepareReader() error {
 	// If we are not currently reading from a disk file, but items have spilled to the current writing file.
 	// This means we need to switch the current writing file to a reading file.
 	if q.reader != nil || !q.hasSpilled.Load() {
@@ -180,7 +180,7 @@ func (q *InferenceQueue[T]) prepareReader() error {
 
 	// 2. Create a NEW temporary file immediately for any subsequent pushes.
 	// This is crucial to ensure that new pushes go to a clean file while the old one is being consumed.
-	newFile, err := os.CreateTemp("", "inference-queue-*.tmp")
+	newFile, err := os.CreateTemp("", "model-queue-*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create new temporary file for subsequent writes: %w", err)
 	}
@@ -201,7 +201,7 @@ func (q *InferenceQueue[T]) prepareReader() error {
 }
 
 // FinalizeWriter ensures the writer is flushed and its file closed, preserving the file for later reading.
-func (q *InferenceQueue[T]) finalizeWriter() error {
+func (q *ModelQueue[T]) finalizeWriter() error {
 	if q.writer != nil {
 		if err := q.writer.Flush(); err != nil {
 			return fmt.Errorf("failed to flush writer in FinalizeWriter: %w", err)
@@ -224,7 +224,7 @@ func (q *InferenceQueue[T]) finalizeWriter() error {
 // currently in a "spilled" state (meaning the previous temp file is active for writing),
 // it writes the item to the temporary file.
 // Returns an error if the queue is closed or if marshaling/writing fails.
-func (q *InferenceQueue[T]) Push(item T) error {
+func (q *ModelQueue[T]) Push(item T) error {
 	// Check if the queue is closed before proceeding
 	if q.isClosed.Load() {
 		return fmt.Errorf("queue is closed, cannot push items")
@@ -275,7 +275,7 @@ func (q *InferenceQueue[T]) Push(item T) error {
 // It tries to store items in memory first. If memory is full, or if the queue is
 // currently in a "spilled" state, it writes items to the temporary file.
 // Returns an error if the queue is closed or if marshaling/writing fails for any item.
-func (q *InferenceQueue[T]) PushBatch(items []T) error {
+func (q *ModelQueue[T]) PushBatch(items []T) error {
 	if q.isClosed.Load() {
 		return fmt.Errorf("queue is closed, cannot push items")
 	}
@@ -333,7 +333,7 @@ func (q *InferenceQueue[T]) PushBatch(items []T) error {
 // or if no file is currently being read, it will transition the current writing
 // file to a reading file and create a new writing file.
 // Returns io.EOF if the queue is closed and empty, indicating no more items will arrive.
-func (q *InferenceQueue[T]) GetBatch() ([]T, error) {
+func (q *ModelQueue[T]) GetBatch() ([]T, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -370,7 +370,7 @@ func (q *InferenceQueue[T]) GetBatch() ([]T, error) {
 
 // Close cleans up the temporary files and signals consumers to stop.
 // It should be called when the application is shutting down to ensure proper resource release.
-func (q *InferenceQueue[T]) Close() error {
+func (q *ModelQueue[T]) Close() error {
 	// Idempotent check: if already closed, do nothing
 	if !q.isClosed.CompareAndSwap(false, true) {
 		return nil
@@ -408,7 +408,7 @@ func (q *InferenceQueue[T]) Close() error {
 
 // Reset clears the in-memory queue and resets counters.
 // Any unconsumed disk-spilled data will remain — make sure the queue is empty before calling this.
-func (q *InferenceQueue[T]) Reset() error {
+func (q *ModelQueue[T]) Reset() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

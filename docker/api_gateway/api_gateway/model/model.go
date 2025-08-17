@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"api_gateway/config"
-	"api_gateway/inference_queue"
 	"api_gateway/logger"
+	"api_gateway/model_queue"
 	"api_gateway/utils"
 )
 
@@ -147,7 +147,7 @@ func callModelAPIWithQueue(client *http.Client, model string, textItems []TextIt
 	if queueAny == nil {
 		return fmt.Errorf("failed to obtain inference queue from pool")
 	}
-	queue := queueAny.(*inference_queue.InferenceQueue[TextItem])
+	queue := queueAny.(*model_queue.ModelQueue[TextItem])
 	defer func() {
 		err := queue.Reset()
 		if err != nil {

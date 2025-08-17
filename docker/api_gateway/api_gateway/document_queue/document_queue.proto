@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package documentqueue;
+option go_package = "api_gateway/document_queue";
+
+message DocumentQueuePayload {
+  int32 site_id = 1;
+  int32 id = 2;
+  string text = 3;
+  map<string, string> extra = 4;
+  int64 timestampMillis = 5;
+}
