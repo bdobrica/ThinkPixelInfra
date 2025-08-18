@@ -158,3 +158,15 @@ func GetEnvByteSize(key string, defaultValue uint64) uint64 {
 	}
 	return byteSize
 }
+
+// GetEnvPercentage fetches an environment variable as a percentage (0-100) or returns a default value
+func GetEnvPercentage(key string, defaultValue float64) float64 {
+	value := GetEnvFloat(key, defaultValue)
+	if value < 0 || value > 100 {
+		return defaultValue
+	}
+	if value > 1 && value <= 100 {
+		return value / 100.0 // Convert percentage to a fraction
+	}
+	return value // Already a fraction
+}

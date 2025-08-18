@@ -5,13 +5,15 @@ import (
 	"fmt"
 
 	"github.com/nats-io/nats.go"
-	"google.golang.org/protobuf/proto"
-	// import generated pb.go
+	"google.golang.org/protobuf/proto" // import generated pb.go
 )
 
+// natsConn is the global NATS connection used for publishing and subscribing to document queue messages.
 var natsConn *nats.Conn
 
-// Init initializes the document queue system (NATS for now) using env vars
+// Init sets up the document queue system using NATS.
+// It reads environment variables for connection details, authentication, and TLS configuration.
+// Returns an error if connection or authentication fails.
 func Init() error {
 	natsURL := config.GetEnv("API_GATEWAY_NATS_URL", "nats://localhost:4222")
 	nkeyPath := config.GetEnv("API_GATEWAY_NATS_NKEY_PATH", "/etc/nats/nkeys/default.nk")
@@ -44,7 +46,8 @@ func Init() error {
 	return nil
 }
 
-// Publish publishes a protobuf message to the document queue
+// Publish sends a protobuf-encoded DocumentQueuePayload to the specified NATS subject.
+// Returns an error if the connection is not initialized or if marshaling fails.
 func Publish(subject string, payload *DocumentQueuePayload) error {
 	if natsConn == nil {
 		return fmt.Errorf("NATS connection not initialized")
@@ -56,7 +59,9 @@ func Publish(subject string, payload *DocumentQueuePayload) error {
 	return natsConn.Publish(subject, data)
 }
 
-// Subscribe subscribes to a subject and calls handler for each protobuf message
+// Subscribe registers a handler function for messages on the given NATS subject.
+// The handler receives each message as a decoded DocumentQueuePayload.
+// Returns the subscription object and any error encountered during setup.
 func Subscribe(subject string, handler func(payload *DocumentQueuePayload)) (*nats.Subscription, error) {
 	if natsConn == nil {
 		return nil, fmt.Errorf("NATS connection not initialized")

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"api_gateway/auth"
+	"api_gateway/document_queue"
 	"api_gateway/handlers"
 	"api_gateway/logger"
 	"api_gateway/middleware"
@@ -35,6 +36,9 @@ func main() {
 
 	// Register Routes
 	r.HandleFunc("/register", register.RegisterHandler).Methods("POST")
+
+	// Start the Document Queue subscribtion manager
+	go document_queue.SubscriptionManager()
 
 	// Start Server
 	logger.Infof("API Gateway is running on port 8080")

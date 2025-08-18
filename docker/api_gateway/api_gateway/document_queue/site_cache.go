@@ -7,26 +7,29 @@ import (
 	"api_gateway/db"
 )
 
-// cacheEntry represents an in-memory cache entry for an API key
+// cacheEntry holds metadata and configuration for a site's API key, used for caching site-specific model and indexing info.
 type cacheEntry struct {
-	ID               int
-	IndexingNodeType string
-	IndexingNode     string
-	ExpiresAt        time.Time
-	Model            string
-	ChunkSize        int
-	ChunkOverlap     int
+	ID               int       // Unique identifier for the site/API key
+	IndexingNodeType string    // Type of indexing backend (e.g., "qdrant", "redis")
+	IndexingNode     string    // Identifier or address of the indexing node
+	ExpiresAt        time.Time // Expiration time for the cache entry
+	Model            string    // Model name used for embeddings
+	ChunkSize        int       // Chunk size for text splitting
+	ChunkOverlap     int       // Overlap size for text chunks
 }
 
-// siteCache stores valid API keys in-memory
+// siteCache is an in-memory thread-safe cache for site API key data.
+// It maps site IDs to cacheEntry structs and uses a RWMutex for concurrency safety.
 var siteCache = struct {
-	Data map[int32]cacheEntry
-	Lock sync.RWMutex
+	Data map[int32]cacheEntry // Cached site data by site ID
+	Lock sync.RWMutex         // Read-write mutex for safe concurrent access
 }{
 	Data: make(map[int32]cacheEntry),
 }
 
-// getCachedSiteData retrieves cached API Key data by API Key ID, repopulating the cache if necessary
+// getCachedSiteData returns the cacheEntry for a given siteId.
+// If the entry is missing or expired, it queries the database and repopulates the cache.
+// Removes expired entries before querying the database.
 func getCachedSiteData(siteId int32) (cacheEntry, error) {
 	// Check the in-memory cache first
 	siteCache.Lock.RLock()
@@ -67,7 +70,8 @@ func getCachedSiteData(siteId int32) (cacheEntry, error) {
 	return cacheEntry, nil
 }
 
-// PeriodicCacheCleanup removes expired entries from the cache
+// PeriodicCacheCleanup runs every hour to remove expired cache entries from siteCache.
+// This prevents memory leaks and ensures only valid API keys remain cached.
 func PeriodicCacheCleanup() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
