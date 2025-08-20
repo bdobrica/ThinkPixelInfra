@@ -34,7 +34,7 @@ type APIKeyDetails struct {
 func GetDBConnection() (*sql.DB, error) {
 	var err error
 	initOnce.Do(func() {
-		dsn := config.GetEnv("API_GATEWAY_DB_DSN", "thinkpixel:thinkpixel@tcp(mysql:3306)/thinkpixel")
+		dsn := config.GetEnv("API_GATEWAY_SITE_DB_DSN", "thinkpixel:thinkpixel@tcp(mysql:3306)/thinkpixel")
 		dsn += "?parseTime=true"
 		dbInstance, err = sql.Open("mysql", dsn)
 		if err != nil {

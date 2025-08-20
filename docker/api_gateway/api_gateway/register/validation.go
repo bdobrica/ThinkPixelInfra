@@ -21,7 +21,7 @@ type ValidationResponse struct {
 }
 
 func verifyDomain(domain, path, token string) {
-	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SUFFIX", "?rest_route=/thinkpixel/v1/validate/")
+	validationSuffix := config.GetEnv("API_GATEWAY_VALIDATION_SITE_PATH", "?rest_route=/thinkpixel/v1/validate/")
 	timeout := config.GetEnvDuration("API_GATEWAY_VALIDATION_TIMEOUT", 5*time.Second)
 
 	maxAttempts := int32(config.GetEnvInt("API_GATEWAY_VALIDATION_MAX_ATTEMPTS", 3))

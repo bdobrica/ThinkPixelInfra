@@ -7,22 +7,22 @@ The API Gateway is a RESTful API that serves as an entry point to the system. It
 - `LOCAL`: If set, the API Gateway will run locally. Default: `false`
 - `API_GATEWAY_JWT_SECRET`: JWT secret. Default: `supersecretkey`
 - `API_GATEWAY_MODEL_URL`: Model URL. Default: `http://model:8000/infer`
-- `API_GATEWAY_DB_DSN`: Database DSN. Default: `thinkpixel:thinkpixel@tcp(thinkpixel:3306)/thinkpixel`
+- `API_GATEWAY_SITE_DB_DSN`: Database DSN. Default: `thinkpixel:thinkpixel@tcp(thinkpixel:3306)/thinkpixel`
 - `API_GATEWAY_API_KEY_VALIDITY`: API key validity at registration, in days. Default: `30`
 - `API_GATEWAY_REDIS_PASSWORD`: Redis password. Default: ``
 - `API_GATEWAY_REDIS_CLIENT_TTL`: Redis client TTL in cache, in seconds. Default: `3600`
 - `API_GATEWAY_QDRANT_API_KEY`: Qdrant API key. Default: ``
 - `API_GATEWAY_QDRANT_CLIENT_TTL`: Qdrant client TTL in cache, in seconds. Default: `3600`
-- `API_GATEWAY_VALIDATION_SUFFIX`: The suffix appended to `<domain><path>` to call for validation of registration request. Default: `wp-content/plugins/thinkpixel/rpc/validate/`
+- `API_GATEWAY_VALIDATION_SITE_PATH`: The suffix appended to `<domain><path>` to call for validation of registration request. Default: `wp-content/plugins/thinkpixel/rpc/validate/`
 - `API_GATEWAY_VALIDATION_TIMEOUT`: Timeout for validation request, as interval. Default: `5s`
 - `API_GATEWAY_MODEL_TIMEOUT`: Timeout for model request, as interval. Default: `10s`
 - `API_GATEWAY_VALIDATION_MAX_ATTEMPTS`: Number of retries for validation attempts. Default: `3`
-- `API_GATEWAY_LOG_FILE_PATH`: Log file path for requests. Default: `/var/log/requests.jsonl`
+- `API_GATEWAY_LOG_FILE_PATH_TEMPLATE`: Log file path for requests. Default: `/var/log/requests.jsonl`
 - `API_GATEWAY_LOG_MAX_SIZE`: Maximum log file size, in bytes. Default: `10485760` (10MB)
 - `API_GATEWAY_LOG_MAX_FILES`: Maximum number of log files. Default: `5`
 - `API_GATEWAY_LOG_BUFFER_SIZE`: Log level. Default: `100`
 - `API_GATEWAY_LOG_FLUSH_INTERVAL`: Log flush interval, in seconds. Default: `60`
-- `API_GATEWAY_INSECURE_VALIDATION`: If set, the API Gateway will use HTTP instead of HTTPS for validation requests. Default: `false` (don't use this in production!)
+- `API_GATEWAY_ENABLE_INSECURE_VALIDATION`: If set, the API Gateway will use HTTP instead of HTTPS for validation requests. Default: `false` (don't use this in production!)
 
 ## API Flows
 ### Search Flow

@@ -141,9 +141,11 @@ func stopSubscription() error {
 // - If latency is above target, probabilistically stops or starts the subscriber based on tunnelingProbability.
 // - Runs in a loop, checking latency at intervals.
 func SubscriptionManager() {
-	targetLatencyMs := config.GetEnvFloat("API_GATEWAY_MODEL_TARGET_LATENCY_MS", 100)                        // Default target latency in ms
+	targetLatency := config.GetEnvDuration("API_GATEWAY_MODEL_TARGET_LATENCY", 100*time.Millisecond)         // Default target latency in ms
 	tunnelingProbability := config.GetEnvPercentage("API_GATEWAY_MODEL_TUNNELING_PROBABILITY", 0.1)          // Default tunneling probability
 	latencyCheckInterval := config.GetEnvDuration("API_GATEWAY_MODEL_LATENCY_CHECK_INTERVAL", 5*time.Second) // Default latency check interval
+
+	targetLatencyMs := float64(targetLatency.Milliseconds())
 
 	logger.Infof("Starting SubscriptionManager with target latency %.2f ms and tunneling probability %.2f", targetLatencyMs, tunnelingProbability)
 

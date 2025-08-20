@@ -15,7 +15,7 @@ var natsConn *nats.Conn
 // It reads environment variables for connection details, authentication, and TLS configuration.
 // Returns an error if connection or authentication fails.
 func Init() error {
-	natsURL := config.GetEnv("API_GATEWAY_NATS_URL", "nats://localhost:4222")
+	natsURL := config.GetEnv("API_GATEWAY_NATS_URL", "nats://nats:4222")
 	nkeyPath := config.GetEnv("API_GATEWAY_NATS_NKEY_PATH", "/etc/nats/nkeys/default.nk")
 	tlsCertPath := config.GetEnv("API_GATEWAY_NATS_TLS_CERT", "/etc/nats/tls/cert.pem")
 	tlsKeyPath := config.GetEnv("API_GATEWAY_NATS_TLS_KEY", "/etc/nats/tls/key.pem")
