@@ -1,4 +1,33 @@
-import base64
+"""
+Inference module for Snowflake Arctic embedding model with ZeroMQ communication.
+
+This module provides the core inference functionality for the Snowflake Arctic embedding
+model using ONNX Runtime. It handles model loading, batch processing, and ZeroMQ-based
+worker communication for scalable inference serving.
+
+Classes:
+    EmptyBatchError: Custom exception for empty input batches
+    InferenceWorker: Worker process for handling inference requests
+
+Functions:
+    start_inference_workers: Starts multiple inference worker processes
+
+Key Features:
+- ONNX Runtime-based model inference with configurable device placement
+- Multi-process worker architecture using ZeroMQ for communication
+- Batch processing with automatic empty batch handling
+- Integration with preprocessing and postprocessing pipelines
+- Support for both dense and sparse vector outputs
+- Configurable number of workers for scaling
+
+The inference pipeline:
+1. Receives text items via ZeroMQ
+2. Preprocesses text using tokenizer
+3. Runs ONNX model inference
+4. Postprocesses results with offset extraction
+5. Returns embedding vectors and metadata
+"""
+
 import json
 import logging
 import time
@@ -17,11 +46,18 @@ from .config import (
     MODEL_PATH,
     MODEL_ZMQ_WORKER_ADDR,
 )
-from .tokens import build_batch_sparse_vectors
+from .postprocess import build_results
+from .preprocess import prepare_text_items
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger(__name__)
+
+
+class EmptyBatchError(Exception):
+    """Custom exception for empty input batches."""
+
+    pass
 
 
 # Load model and tokenizer globally (to save memory per worker)
@@ -42,7 +78,7 @@ def load_model():
     )
 
 
-def process_task(context: zmq.Context):
+def _process_task(context: zmq.Context):
     """Worker process for running inference."""
     global tokenizer, session
 
@@ -61,13 +97,29 @@ def process_task(context: zmq.Context):
             # Parse the request
             data = json.loads(request)
             text_items = data.get("text_items", [])
+            chunk_size = data.get("chunk_size", 1000)
+            chunk_overlap = data.get("chunk_overlap", 200)
+
+            if not text_items:
+                raise EmptyBatchError("No text items provided for inference.")
 
             logger.debug("Received %s text items for inference.", len(text_items))
+
+            text_items = prepare_text_items(text_items, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
+            if not text_items:
+                raise EmptyBatchError("No valid text items after preparation.")
+
+            logger.debug("Prepared %s text items for inference.", len(text_items))
 
             batch_text = [item.get("text", "") for item in text_items]
 
             # Batch encode and process with the model
-            logger.debug("Processing %s chunks...", len(batch_text))
+            logger.debug(
+                "Processing %s chunks of %s bytes...",
+                len(batch_text),
+                sum(len(text.encode("utf-8")) for text in batch_text),
+            )
             batch_input = tokenizer(batch_text, padding=True, truncation=True, return_tensors="np")
             batch_tokens = map(tokenizer.convert_ids_to_tokens, batch_input.input_ids)
             model_output = session.run(
@@ -77,46 +129,28 @@ def process_task(context: zmq.Context):
                     "attention_mask": batch_input.attention_mask.astype("int64"),
                 },
             )
-            batch_dense_vectors = model_output[0]
-            batch_weights = model_output[1]
-
-            # Prepare results
-            batch_sparse_vectors = build_batch_sparse_vectors(
-                batch_tokens,  # type: ignore
-                batch_weights,
-            )
-
-            results = []
-            for text_item, dense_vector, sparse_vector in zip(
-                text_items,
-                batch_dense_vectors,
-                batch_sparse_vectors,
-            ):
-                metadata = text_item.get("metadata", {})
-                results.append(
-                    {
-                        "text": text_item.get("text", ""),
-                        "dense_vector": base64.b64encode(dense_vector.flatten().astype(">f4").tobytes()).decode(
-                            "utf-8"
-                        ),
-                        "sparse_vector": sparse_vector.to_dict(),
-                        "metadata": {
-                            **metadata,
-                            "extra": {
-                                **metadata.get("extra", {}),
-                                "language": sparse_vector.language,
-                            },
-                        },
-                    }
-                )
+            results = build_results(text_items, batch_tokens, model_output)
 
             logger.debug("Sending %s results...", len(results))
             response = {"results": results}
+        except EmptyBatchError as e:
+            logger.warning("Empty batch received: %s", e)
+            response = {"results": []}
         except Exception as e:
             logger.exception("Error processing task.")
             response = {"error": str(e)}
 
         socket.send_multipart([identity, b"", json.dumps(response).encode("utf-8")])
+
+
+def process_task(context: zmq.Context):
+    """Process task in a separate worker process."""
+    try:
+        _process_task(context)
+    except Exception as e:
+        logger.error("Worker process encountered an error: %s", e)
+    finally:
+        logger.info("Worker process exiting.")
 
 
 def inference_server():

@@ -1,3 +1,28 @@
+"""
+Main entry point for the Snowflake Arctic embedding server.
+
+This module orchestrates the complete embedding service by starting and managing
+multiple processes: FastAPI HTTP server, ZeroMQ proxy, and inference workers.
+It provides a unified entry point for running the embedding service in production.
+
+Functions:
+    start_processes: Creates and manages all service processes
+    main: Entry point with command-line argument handling
+
+Process Architecture:
+- FastAPI Server: Handles HTTP requests and health checks
+- ZMQ Proxy: Routes requests between API server and workers
+- Inference Workers: Multiple processes running the embedding model
+- Process Management: Monitors and gracefully shuts down all processes
+
+The service can run in two modes:
+- Production mode: All processes (API + proxy + workers)
+- Local mode: FastAPI only (for development and testing)
+
+Usage:
+    python -m snowflake_arctic [--local]
+"""
+
 import logging
 import multiprocessing
 import sys
@@ -18,15 +43,9 @@ mp_context = multiprocessing.get_context("fork")
 def start_processes():
     # Start the subprocesses
     processes = {
-        "proxy_server": mp_context.Process(
-            target=proxy_server, name="proxy_server"
-        ),
-        "fastapi_server": mp_context.Process(
-            target=fastapi_server, name="fastapi_server"
-        ),
-        "inference_server": mp_context.Process(
-            target=inference_server, name="inference_server"
-        ),
+        "proxy_server": mp_context.Process(target=proxy_server, name="proxy_server"),
+        "fastapi_server": mp_context.Process(target=fastapi_server, name="fastapi_server"),
+        "inference_server": mp_context.Process(target=inference_server, name="inference_server"),
     }
 
     logger.info("Starting processes...")
@@ -40,9 +59,7 @@ def start_processes():
             for name, process in processes.items():
                 if not process.is_alive():  # Process has exited
                     retcode = process.exitcode
-                    logger.error(
-                        "Process %s exited with code %s.", name, retcode
-                    )
+                    logger.error("Process %s exited with code %s.", name, retcode)
                     # Terminate the other process
                     for other_name, other_process in processes.items():
                         if other_name != name:
