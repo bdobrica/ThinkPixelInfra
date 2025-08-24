@@ -14,16 +14,16 @@ The [Snowflake Arctic](https://huggingface.co/Snowflake/snowflake-arctic-embed-l
 
 ## Weight Files
 
-The script downloads the weights for the model from the specified URL and saves them in the  weights  directory. The weights consist of the following files: 
+The script downloads the weights for the model from the specified URL and saves them in the  weights  directory. The weights consist of the following files:
 
 - `model.onnx` : The model configuration file
-- `model.onnx_data.??` : The model weights. As this is a large file, it is split into multiple parts of ~200MB each. 
+- `model.onnx_data.??` : The model weights. As this is a large file, it is split into multiple parts of ~200MB each.
 - `model.onnx_data.sha256sum` : The SHA256 checksum of the model weights to verify the integrity of the downloaded files and their joining.
 - `special_tokens_map.json` : Special tokens map
 - `tokenizer.json` : Tokenizer configuration
 - `tokenizer_config.json` : Tokenizer configuration
 
-The script creates the  weights  directory if it doesn’t exist and then downloads each file to the appropriate subdirectory. 
+The script creates the  weights  directory if it doesn’t exist and then downloads each file to the appropriate subdirectory.
 
 ## Resources
 
@@ -64,6 +64,7 @@ Example response:
   "results": [
     {
       "text": "This is a very long piece of text ...",
+      "offset": 0,
       "dense_vector": "<base 64 encoded np.float32 array>",
       "sparse_vector": {
         "<base 64 encoded >L packed mmh3 of `long`>": "<base 64 encoded >f packed float32 normalized weight>",
@@ -85,6 +86,7 @@ Example response:
 Notes:
 - The `results` field is a list of output text items;
 - The `text` field is the input text item;
+- The `offset` field is the character offset of the chunk in the original text; as now the model splits long texts into chunks, this is useful to identify the position of the chunk in the original text;
 - The `dense_vector` field is a base64 encoded numpy array of type `np.float32`; the vector has dimensions of 1024x1;
 - The `sparse_vector` field is a dictionary of token integer indices and their float normalized weights, where:
     - the key is the base64 packed big-endian unsigned long pack of absolute value of mmh3 of token; special tokens and punctuation are excluded from the token weights; tokens are converted to their lowercase lemma form; supported languages are English, French, German, Spanish, Italian and Romanian via spacy;

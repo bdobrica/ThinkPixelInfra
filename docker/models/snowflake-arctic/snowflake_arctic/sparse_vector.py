@@ -1,84 +1,113 @@
+"""
+Sparse vector representation module for text embedding sparse features.
+
+This module provides the SparseVector class for handling sparse vector representations
+of text embeddings. It processes tokens and their weights, filters out stopwords and
+punctuation, and provides methods for converting to dictionary format with hashing.
+
+Classes:
+    SparseVector: Represents a sparse vector with tokens and weights
+
+The sparse vector implementation:
+- Filters out stopwords and punctuation based on spaCy language models
+- Uses MMH3 hashing for token indices in the final representation
+- Encodes weights as base64 floats for efficient storage
+- Supports multiple languages through spaCy language detection
+"""
+
 import base64
 import logging
-import re
-import time
 from struct import pack
 from typing import Dict, Iterable
 
 import mmh3
-from fast_langdetect import detect
 from spacy.tokens import Doc
 
 from .config import LOG_LEVEL
-from .language import load_spacy_model
+from .language import LanguageModel
 
 logging.basicConfig(level=LOG_LEVEL)
 
 
 class SparseVector:
     """
-    Represents a sparse vector with tokens and their weights.
-    """
+    Represents a sparse vector with tokens and their weights for text embeddings.
 
-    LANG_DETECT_MAX_LENGTH = 100
+    This class processes tokens and their associated weights to create a sparse
+    vector representation. It filters out stopwords and punctuation, normalizes
+    tokens using spaCy language models, and provides conversion to dictionary
+    format with MMH3 hashing for efficient storage and retrieval.
+
+    Attributes:
+        language_model (LanguageModel): Language model for token processing
+        tokens (list): List of input tokens
+        weights (Iterable[float]): Weights corresponding to each token
+        logger: Logger instance for debugging
+
+    Example:
+        >>> from snowflake_arctic.language import LanguageModel
+        >>> lm = LanguageModel("Hello world example")
+        >>> tokens = ["hello", "world", "example"]
+        >>> weights = [0.8, 0.6, 0.9]
+        >>> sv = SparseVector(lm, tokens, weights)
+        >>> sparse_dict = sv.to_dict()
+    """
 
     @staticmethod
     def _base64_uint(x: int) -> str:
         """
-        Converts an unsigned integer to a base64 string.
+        Convert an unsigned integer to a base64-encoded string.
+
+        Args:
+            x (int): Unsigned integer to encode
+
+        Returns:
+            str: Base64-encoded string representation
         """
         return base64.b64encode(pack(">L", x)).decode("utf-8")
 
     @staticmethod
     def _base64_float(x: float) -> str:
         """
-        Converts a float to a base64 string.
+        Convert a float to a base64-encoded string.
+
+        Args:
+            x (float): Float value to encode
+
+        Returns:
+            str: Base64-encoded string representation
         """
         return base64.b64encode(pack(">f", x)).decode("utf-8")
 
-    def __init__(self, tokens: Iterable[str], weights: Iterable[float]):
+    def __init__(self, language_model: LanguageModel, tokens: Iterable[str], weights: Iterable[float]):
+        """
+        Initialize the SparseVector with tokens and weights.
+
+        Args:
+            language_model (LanguageModel): Language model for processing tokens
+            tokens (Iterable[str]): Input tokens to process
+            weights (Iterable[float]): Weights corresponding to each token
+        """
         self.logger = logging.getLogger(__class__.__name__)
+        self.language_model = language_model
         self.tokens = list(tokens)
         self.weights = weights
-        self.language = self._detect_language(" ".join(self.tokens))
-
-    def _prepare_text_for_language_detection(self, text: str) -> str:
-        text_ = re.sub(r"\s+", " ", text.lower().strip())
-        text_ = text_[: self.LANG_DETECT_MAX_LENGTH]
-        last_space_pos = text_.rfind(" ")
-        if last_space_pos != -1:
-            text_ = text_[:last_space_pos]
-        return text_
-
-    def _detect_language(self, text: str) -> str:
-        """
-        Detects the language of the given text.
-        Expects fast_langdetect.detect to return a dict with 'lang' and 'score'.
-        """
-        start_time = time.perf_counter()
-        text_ = self._prepare_text_for_language_detection(text)
-        result = detect(text_)
-        elapsed_time = time.perf_counter() - start_time
-        score = float(result.get("score", 0))
-        lang = str(result.get("lang", "unk"))
-
-        self.logger.debug(
-            "Detected language: %s with score: %f (time: %f)",
-            lang,
-            score,
-            elapsed_time,
-        )
-
-        if score > 0.2:
-            return lang
-
-        return "unk"  # fallback to unknown if score is low
 
     def _build_doc(self) -> Doc:
         """
-        Builds a spaCy Doc object from the given tokens.
+        Build a spaCy Doc object from the tokens for linguistic processing.
+
+        Creates a spaCy Doc from the input tokens and processes it through
+        the language model pipeline for linguistic analysis including
+        lemmatization, POS tagging, and stopword detection.
+
+        Returns:
+            Doc: Processed spaCy Doc object
+
+        Raises:
+            ValueError: If there's a mismatch between input tokens and processed Doc length
         """
-        nlp = load_spacy_model(self.language)
+        nlp = self.language_model.nlp
         doc = Doc(nlp.vocab, words=self.tokens)
         doc = nlp(doc)
 
@@ -89,9 +118,19 @@ class SparseVector:
 
     def _to_dict(self) -> Dict[str, float]:
         """
-        Maps tokens to their weights.
-        Filters out stop words, punctuation, and zero weights.
-        Normalizes the weights.
+        Map tokens to their weights after filtering and normalization.
+
+        Creates a dictionary mapping from token lemmas to their normalized weights.
+        Filters out stopwords, punctuation, and tokens with zero or negative weights.
+        Performs L2 normalization on the final weights.
+
+        Returns:
+            Dict[str, float]: Dictionary mapping token lemmas to normalized weights
+
+        Note:
+            - Stopwords and punctuation are filtered based on spaCy language model
+            - Only positive weights are included
+            - Final weights are L2 normalized
         """
         doc = self._build_doc()
 
@@ -113,9 +152,19 @@ class SparseVector:
 
     def to_dict(self) -> Dict[str, str]:
         """
-        Builds a sparse vector from the given tokens and weights.
-        Uses mmh3 to hash the tokens into a fixed-size vector.
-        All numbers are represented in Big Endian base64 format.
+        Build a sparse vector dictionary with hashed token indices and base64-encoded weights.
+
+        Converts the processed tokens and weights into a final sparse vector representation
+        suitable for storage and retrieval. Uses MMH3 hashing to convert token lemmas into
+        fixed-size indices and encodes all values in Big Endian base64 format.
+
+        Returns:
+            Dict[str, str]: Dictionary mapping base64-encoded token hashes to
+                          base64-encoded normalized weights
+
+        Note:
+            All numeric values are represented in Big Endian base64 format for
+            consistent encoding across different platforms.
         """
         token_weights = self._to_dict()
         return dict(
@@ -129,4 +178,10 @@ class SparseVector:
         )
 
     def __repr__(self):
+        """
+        Return string representation of the SparseVector instance.
+
+        Returns:
+            str: String representation showing tokens and weights
+        """
         return f"SparseVector(tokens={self.tokens}, weights={self.weights})"
