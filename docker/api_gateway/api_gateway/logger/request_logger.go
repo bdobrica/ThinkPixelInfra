@@ -260,16 +260,16 @@ var RLogger *RequestLogger
 
 func init() {
 	// Read configuration from environment variables
-	// API_GATEWAY_LOG_FILE_PATH is now a template, e.g. "/var/log/requests-%s.jsonl"
-	fileTemplate := config.GetEnv("API_GATEWAY_LOG_FILE_PATH", "/var/log/api-gateway/requests-%s.jsonl")
-	maxSize := config.GetEnvInt64("API_GATEWAY_LOG_MAX_SIZE", 10_485_760)                    // default 10 MB
+	// API_GATEWAY_LOG_FILE_PATH_TEMPLATE is now a template, e.g. "/var/log/requests-%s.jsonl"
+	fileTemplate := config.GetEnv("API_GATEWAY_LOG_FILE_PATH_TEMPLATE", "/var/log/api-gateway/requests-%s.jsonl")
+	maxSize := config.GetEnvByteSize("API_GATEWAY_LOG_MAX_SIZE", 10_485_760)                 // default 10 MB
 	maxFiles := config.GetEnvInt("API_GATEWAY_LOG_MAX_FILES", 5)                             // default 5
 	bufferSize := config.GetEnvInt("API_GATEWAY_LOG_BUFFER_SIZE", 100)                       // default 100
 	flushInterval := config.GetEnvDuration("API_GATEWAY_LOG_FLUSH_INTERVAL", 60*time.Second) // default 60 seconds
 
 	// Create the logger using the file template.
 	var err error
-	RLogger, err = NewLogger(fileTemplate, maxSize, maxFiles, bufferSize, flushInterval)
+	RLogger, err = NewLogger(fileTemplate, int64(maxSize), maxFiles, bufferSize, flushInterval)
 	if err != nil {
 		// Errorf is assumed to be a helper that logs errors.
 		Errorf("Failed to create request logger: %v", err)

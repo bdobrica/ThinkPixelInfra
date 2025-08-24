@@ -6,7 +6,7 @@ import (
 )
 
 func getUrlProtocol() string {
-	insecureValidation := config.GetEnvBool("API_GATEWAY_INSECURE_VALIDATION", false)
+	insecureValidation := config.GetEnvBool("API_GATEWAY_ENABLE_INSECURE_VALIDATION", false)
 	if insecureValidation {
 		logger.Warningf("Insecure validation is enabled. Using HTTP protocol. Not recommended for production.")
 		return "http"

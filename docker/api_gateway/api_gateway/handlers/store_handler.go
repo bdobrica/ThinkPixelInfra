@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
 	"api_gateway/auth"
+	"api_gateway/document_queue"
 	"api_gateway/logger"
 	"api_gateway/middleware"
-	"api_gateway/model"
-	"api_gateway/qdrantconn"
-	"api_gateway/redisconn"
 	"api_gateway/utils"
 )
 
@@ -22,27 +19,10 @@ type StoreRequest []struct {
 }
 
 type StoreResponse struct {
-	ReceivedTexts   int    `json:"received_texts"`
-	StoredDocuments int    `json:"stored_documents"`
-	StoredIDs       []int  `json:"stored_ids,omitempty"`
-	Timestamp       string `json:"timestamp"`
-}
-
-type StoreCallback func([]model.EmbeddingResponse) (int, error)
-
-func getStoreCallback(cacheEntry auth.CacheEntry) (StoreCallback, error) {
-	switch cacheEntry.IndexingNodeType {
-	case "qdrant":
-		return func(embeddings []model.EmbeddingResponse) (int, error) {
-			return qdrantconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings)
-		}, nil
-	case "redis":
-		return func(embeddings []model.EmbeddingResponse) (int, error) {
-			return redisconn.StoreEmbeddings(cacheEntry.ID, cacheEntry.IndexingNode, embeddings)
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported IndexingNode: %s", cacheEntry.IndexingNode)
-	}
+	ReceivedTexts    int    `json:"received_texts"`
+	PendingDocuments int    `json:"pending_documents"`
+	PendingIDs       []int  `json:"pending_ids,omitempty"`
+	Timestamp        string `json:"timestamp"`
 }
 
 // StoreHandler handles storing webpage data
@@ -68,62 +48,38 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepare TextItems for model inference
-	textItems := make([]model.TextItem, len(req))
-	for i, item := range req {
-		textItems[i] = model.TextItem{
-			Text: item.Text,
-			Metadata: model.Metadata{
-				ID:    item.ID,
-				Extra: item.Extra,
-			},
+	// Create DocumentQueue object
+	dq := r.Context().Value(middleware.DocumentQueueKey).(*document_queue.DocumentQueue)
+	if dq == nil {
+		utils.RespondWithError(w, http.StatusServiceUnavailable, "DocumentQueue not found in context")
+		return
+	}
+
+	// Publish each document as a protobuf payload to the document queue
+	var failed int
+	var publishedIDs []int
+	for _, item := range req {
+		payload := &document_queue.DocumentQueuePayload{
+			SiteId:          int32(cacheEntry.ID),
+			Id:              int32(item.ID),
+			Text:            item.Text,
+			Extra:           item.Extra,
+			TimestampMillis: time.Now().UnixMilli(),
+		}
+		err := dq.Publish(payload)
+		if err != nil {
+			logger.Errorf("Failed to publish document to queue: %v", err)
+			failed++
+		} else {
+			publishedIDs = append(publishedIDs, item.ID)
 		}
 	}
 
-	// Make async request to the model API to get embeddings
-	responseChan := make(chan []model.EmbeddingResponse, 1)
-	errChan := make(chan error, 1)
-	go func() {
-		response, err := model.GetEmbeddings(textItems, cacheEntry.Model, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		responseChan <- response
-	}()
-
-	select {
-	case embeddings := <-responseChan:
-		// Get the store callback function based on the indexing node type
-		storeCallback, err := getStoreCallback(cacheEntry)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Error getting store callback: "+err.Error())
-			return
-		}
-
-		// Store embeddings in the database
-		storedCount, err := storeCallback(embeddings)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Error storing documents: "+err.Error())
-			return
-		}
-
-		// Prepare response
-		storedIDs := make([]int, len(embeddings))
-		for i, emb := range embeddings {
-			storedIDs[i] = emb.ID
-		}
-		logger.Infof("Stored %d documents for site ID %d", storedCount, cacheEntry.ID)
-
-		_ = utils.RespondWithJSON(w, http.StatusOK, StoreResponse{
-			ReceivedTexts:   len(req),
-			StoredDocuments: storedCount,
-			StoredIDs:       storedIDs,
-			Timestamp:       time.Now().Format(time.RFC3339),
-		})
-	case err := <-errChan:
-		utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving embeddings: "+err.Error())
-	case <-time.After(15 * time.Second):
-		utils.RespondWithError(w, http.StatusRequestTimeout, "Request timed out")
-	}
+	logger.Infof("Queued %d documents (failed: %d) for site ID %d", len(publishedIDs), failed, cacheEntry.ID)
+	_ = utils.RespondWithJSON(w, http.StatusAccepted, StoreResponse{
+		ReceivedTexts:    len(req),
+		PendingDocuments: len(publishedIDs),
+		PendingIDs:       publishedIDs,
+		Timestamp:        time.Now().Format(time.RFC3339),
+	})
 }

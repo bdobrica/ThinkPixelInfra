@@ -24,7 +24,7 @@ type APIKeyResponse struct {
 }
 
 func triggerKeyExchange(domain, path, nonce string) error {
-	keyExchangeSuffix := config.GetEnv("API_GATEWAY_KEY_EXCHANGE_SUFFIX", "?rest_route=/thinkpixel/v1/exchange/")
+	keyExchangeSuffix := config.GetEnv("API_GATEWAY_KEY_EXCHANGE_SITE_PATH", "?rest_route=/thinkpixel/v1/exchange/")
 	protocol := getUrlProtocol()
 	url := fmt.Sprintf("%s://%s%s%s", protocol, domain, path, keyExchangeSuffix)
 	apiKey := GenerateAPIKey()

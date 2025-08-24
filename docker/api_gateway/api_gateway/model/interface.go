@@ -21,6 +21,7 @@ type InferenceRequest struct {
 // EmbeddingsItem represents a single result from the model API, with encoded vectors and metadata.
 type EmbeddingsItem struct {
 	Text         string            `json:"text"`          // The text content
+	Offset       int               `json:"offset"`        // Offset of the chunk in the original text
 	DenseVector  string            `json:"dense_vector"`  // Base64-encoded dense vector
 	SparseVector map[string]string `json:"sparse_vector"` // Base64-encoded sparse vector (key: base64 uint32, value: base64 float32)
 	Metadata     Metadata          `json:"metadata"`      // Associated metadata
