@@ -23,6 +23,9 @@ The API Gateway is a RESTful API that serves as an entry point to the system. It
 - `API_GATEWAY_LOG_BUFFER_SIZE`: Log level. Default: `100`
 - `API_GATEWAY_LOG_FLUSH_INTERVAL`: Log flush interval, in seconds. Default: `60`
 - `API_GATEWAY_ENABLE_INSECURE_VALIDATION`: If set, the API Gateway will use HTTP instead of HTTPS for validation requests. Default: `false` (don't use this in production!)
+- `API_GATEWAY_DOCUMENT_QUEUE_MAX_RETRIES`: Maximum number of retries for document processing. Default: `3`
+- `API_GATEWAY_DOCUMENT_QUEUE_SUBJECT`: NATS subject for document queue. Default: `store.jobs`
+- `API_GATEWAY_DOCUMENT_QUEUE_DLQ_SUFFIX`: Suffix for dead letter queue subject. Default: `.dlq`
 
 ## API Flows
 ### Search Flow

@@ -17,6 +17,8 @@ import (
 func main() {
 	// Initialize Router
 	r := mux.NewRouter()
+	// Initialize the Document Queue
+	dq := document_queue.NewDocumentQueue()
 
 	// Ping Route
 	r.HandleFunc("/ping", ping.PingHandler).Methods("GET")
@@ -25,7 +27,7 @@ func main() {
 	r.HandleFunc("/auth/token", auth.AuthHandler).Methods("POST")
 
 	// Protected Routes
-	r.Handle("/store", middleware.JWTMiddleware(middleware.LoggingMiddleware(http.HandlerFunc(handlers.StoreHandler)))).Methods("POST")
+	r.Handle("/store", middleware.JWTMiddleware(middleware.LoggingMiddleware(middleware.DocumentQueueMiddleware(http.HandlerFunc(handlers.StoreHandler), dq)))).Methods("POST")
 	r.Handle("/store/max_batch_text_size", middleware.JWTMiddleware(http.HandlerFunc(handlers.MaxBatchTextSizeHandler))).Methods("POST")
 	r.Handle("/search", middleware.JWTMiddleware(http.HandlerFunc(handlers.SearchHandler))).Methods("POST")
 	r.Handle("/remove/embedding", middleware.JWTMiddleware(middleware.LoggingMiddleware(http.HandlerFunc(handlers.RemoveEmbeddingsHandler)))).Methods("POST")
@@ -37,8 +39,9 @@ func main() {
 	// Register Routes
 	r.HandleFunc("/register", register.RegisterHandler).Methods("POST")
 
-	// Start the Document Queue subscribtion manager
-	go document_queue.SubscriptionManager()
+	// Document Queue Subscription
+	sm := document_queue.NewSubscriptionManager(dq)
+	go sm.Monitor()
 
 	// Start Server
 	logger.Infof("API Gateway is running on port 8080")

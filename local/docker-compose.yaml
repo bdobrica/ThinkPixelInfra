@@ -38,17 +38,17 @@ services:
     ports:
       - "6333:6333"
 
-  mpnetv2:
-    build:
-      context: ../docker/model/mpnetv2
-      dockerfile: Dockerfile
-    container_name: model
-    volumes:
-      - ../docker/model/weights/mpnetv2/mpnet-base-v2:/app/mpnet-base-v2
-    ports:
-      - "8000:8000"
-    environment:
-      - LOCAL=1
+  # mpnetv2:
+  #   build:
+  #     context: ../docker/models/mpnetv2
+  #     dockerfile: Dockerfile
+  #   container_name: model
+  #   volumes:
+  #     - ../docker/models/weights/mpnetv2/mpnet-base-v2:/app/mpnet-base-v2
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - LOCAL=1
 
   snowflake-arctic:
     build:
@@ -75,6 +75,13 @@ services:
     ports:
       - "3306:3306"
 
+  nats:
+    image: nats:latest
+    container_name: nats
+    ports:
+      - "4222:4222"  # Client connections
+      - "8222:8222"  # Monitoring endpoint
+
   api-gateway:
     build:
       context: ../docker/api_gateway
@@ -82,13 +89,14 @@ services:
     container_name: api-gateway
     environment:
       - LOCAL=1
-      - API_GATEWAY_INSECURE_VALIDATION=1
+      - API_GATEWAY_ENABLE_INSECURE_VALIDATION=1
       - API_GATEWAY_VALIDATION_MAX_ATTEMPTS=10
     ports:
       - "8080:8080"
     depends_on:
       - mysql
       - qdrant
+      - nats
       - snowflake-arctic
 
   mock-site:

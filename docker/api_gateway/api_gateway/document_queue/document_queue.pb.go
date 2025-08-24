@@ -21,15 +21,75 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MessageStatus int32
+
+const (
+	MessageStatus_PENDING     MessageStatus = 0
+	MessageStatus_PROCESSING  MessageStatus = 1
+	MessageStatus_COMPLETED   MessageStatus = 2
+	MessageStatus_FAILED      MessageStatus = 3
+	MessageStatus_DEAD_LETTER MessageStatus = 4
+)
+
+// Enum value maps for MessageStatus.
+var (
+	MessageStatus_name = map[int32]string{
+		0: "PENDING",
+		1: "PROCESSING",
+		2: "COMPLETED",
+		3: "FAILED",
+		4: "DEAD_LETTER",
+	}
+	MessageStatus_value = map[string]int32{
+		"PENDING":     0,
+		"PROCESSING":  1,
+		"COMPLETED":   2,
+		"FAILED":      3,
+		"DEAD_LETTER": 4,
+	}
+)
+
+func (x MessageStatus) Enum() *MessageStatus {
+	p := new(MessageStatus)
+	*p = x
+	return p
+}
+
+func (x MessageStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MessageStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_document_queue_proto_enumTypes[0].Descriptor()
+}
+
+func (MessageStatus) Type() protoreflect.EnumType {
+	return &file_document_queue_proto_enumTypes[0]
+}
+
+func (x MessageStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MessageStatus.Descriptor instead.
+func (MessageStatus) EnumDescriptor() ([]byte, []int) {
+	return file_document_queue_proto_rawDescGZIP(), []int{0}
+}
+
 type DocumentQueuePayload struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	SiteId          int32                  `protobuf:"varint,1,opt,name=site_id,json=siteId,proto3" json:"site_id,omitempty"`
-	Id              int32                  `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
-	Text            string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	Extra           map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	TimestampMillis int64                  `protobuf:"varint,5,opt,name=timestampMillis,proto3" json:"timestampMillis,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	SiteId             int32                  `protobuf:"varint,1,opt,name=site_id,json=siteId,proto3" json:"site_id,omitempty"`
+	Id                 int32                  `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
+	Text               string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	Extra              map[string]string      `protobuf:"bytes,4,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	TimestampMillis    int64                  `protobuf:"varint,5,opt,name=timestamp_millis,json=timestampMillis,proto3" json:"timestamp_millis,omitempty"`
+	RetryCount         int32                  `protobuf:"varint,6,opt,name=retry_count,json=retryCount,proto3" json:"retry_count,omitempty"`
+	MaxRetries         int32                  `protobuf:"varint,7,opt,name=max_retries,json=maxRetries,proto3" json:"max_retries,omitempty"`
+	Status             MessageStatus          `protobuf:"varint,8,opt,name=status,proto3,enum=documentqueue.MessageStatus" json:"status,omitempty"`
+	ErrorMessage       string                 `protobuf:"bytes,9,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	LastRetryTimestamp int64                  `protobuf:"varint,10,opt,name=last_retry_timestamp,json=lastRetryTimestamp,proto3" json:"last_retry_timestamp,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *DocumentQueuePayload) Reset() {
@@ -97,21 +157,72 @@ func (x *DocumentQueuePayload) GetTimestampMillis() int64 {
 	return 0
 }
 
+func (x *DocumentQueuePayload) GetRetryCount() int32 {
+	if x != nil {
+		return x.RetryCount
+	}
+	return 0
+}
+
+func (x *DocumentQueuePayload) GetMaxRetries() int32 {
+	if x != nil {
+		return x.MaxRetries
+	}
+	return 0
+}
+
+func (x *DocumentQueuePayload) GetStatus() MessageStatus {
+	if x != nil {
+		return x.Status
+	}
+	return MessageStatus_PENDING
+}
+
+func (x *DocumentQueuePayload) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *DocumentQueuePayload) GetLastRetryTimestamp() int64 {
+	if x != nil {
+		return x.LastRetryTimestamp
+	}
+	return 0
+}
+
 var File_document_queue_proto protoreflect.FileDescriptor
 
 const file_document_queue_proto_rawDesc = "" +
 	"\n" +
-	"\x14document_queue.proto\x12\rdocumentqueue\"\xfd\x01\n" +
+	"\x14document_queue.proto\x12\rdocumentqueue\"\xcd\x03\n" +
 	"\x14DocumentQueuePayload\x12\x17\n" +
 	"\asite_id\x18\x01 \x01(\x05R\x06siteId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04text\x18\x03 \x01(\tR\x04text\x12D\n" +
-	"\x05extra\x18\x04 \x03(\v2..documentqueue.DocumentQueuePayload.ExtraEntryR\x05extra\x12(\n" +
-	"\x0ftimestampMillis\x18\x05 \x01(\x03R\x0ftimestampMillis\x1a8\n" +
+	"\x05extra\x18\x04 \x03(\v2..documentqueue.DocumentQueuePayload.ExtraEntryR\x05extra\x12)\n" +
+	"\x10timestamp_millis\x18\x05 \x01(\x03R\x0ftimestampMillis\x12\x1f\n" +
+	"\vretry_count\x18\x06 \x01(\x05R\n" +
+	"retryCount\x12\x1f\n" +
+	"\vmax_retries\x18\a \x01(\x05R\n" +
+	"maxRetries\x124\n" +
+	"\x06status\x18\b \x01(\x0e2\x1c.documentqueue.MessageStatusR\x06status\x12#\n" +
+	"\rerror_message\x18\t \x01(\tR\ferrorMessage\x120\n" +
+	"\x14last_retry_timestamp\x18\n" +
+	" \x01(\x03R\x12lastRetryTimestamp\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x1cZ\x1aapi_gateway/document_queueb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*X\n" +
+	"\rMessageStatus\x12\v\n" +
+	"\aPENDING\x10\x00\x12\x0e\n" +
+	"\n" +
+	"PROCESSING\x10\x01\x12\r\n" +
+	"\tCOMPLETED\x10\x02\x12\n" +
+	"\n" +
+	"\x06FAILED\x10\x03\x12\x0f\n" +
+	"\vDEAD_LETTER\x10\x04B\x1cZ\x1aapi_gateway/document_queueb\x06proto3"
 
 var (
 	file_document_queue_proto_rawDescOnce sync.Once
@@ -125,18 +236,21 @@ func file_document_queue_proto_rawDescGZIP() []byte {
 	return file_document_queue_proto_rawDescData
 }
 
+var file_document_queue_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_document_queue_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_document_queue_proto_goTypes = []any{
-	(*DocumentQueuePayload)(nil), // 0: documentqueue.DocumentQueuePayload
-	nil,                          // 1: documentqueue.DocumentQueuePayload.ExtraEntry
+	(MessageStatus)(0),           // 0: documentqueue.MessageStatus
+	(*DocumentQueuePayload)(nil), // 1: documentqueue.DocumentQueuePayload
+	nil,                          // 2: documentqueue.DocumentQueuePayload.ExtraEntry
 }
 var file_document_queue_proto_depIdxs = []int32{
-	1, // 0: documentqueue.DocumentQueuePayload.extra:type_name -> documentqueue.DocumentQueuePayload.ExtraEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 0: documentqueue.DocumentQueuePayload.extra:type_name -> documentqueue.DocumentQueuePayload.ExtraEntry
+	0, // 1: documentqueue.DocumentQueuePayload.status:type_name -> documentqueue.MessageStatus
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_document_queue_proto_init() }
@@ -149,13 +263,14 @@ func file_document_queue_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_document_queue_proto_rawDesc), len(file_document_queue_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_document_queue_proto_goTypes,
 		DependencyIndexes: file_document_queue_proto_depIdxs,
+		EnumInfos:         file_document_queue_proto_enumTypes,
 		MessageInfos:      file_document_queue_proto_msgTypes,
 	}.Build()
 	File_document_queue_proto = out.File

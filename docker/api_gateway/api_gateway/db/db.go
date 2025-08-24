@@ -96,22 +96,15 @@ func GetAPIKeyDetailsByID(siteId int) (APIKeyDetails, error) {
 
 	row := dbConn.QueryRow(query, siteId)
 
-	var id int
-	var indexingNodeType string
-	var indexingNode string
-	var expiresAt sql.NullTime
-	var maxSearchResults int
-	var model string
-	var chunkSize int
-	var chunkOverlap int
-	if err := row.Scan(&id, &indexingNodeType, &indexingNode, &expiresAt, &maxSearchResults, &model, &chunkSize, &chunkOverlap); err != nil {
+	var keyDetails APIKeyDetails
+	if err := row.Scan(&keyDetails.ID, &keyDetails.IndexingNodeType, &keyDetails.IndexingNode, &keyDetails.ExpiresAt, &keyDetails.MaxSearchResults, &keyDetails.Model, &keyDetails.ChunkSize, &keyDetails.ChunkOverlap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return APIKeyDetails{}, errors.New("invalid API key")
+			return APIKeyDetails{}, errors.New("invalid site ID")
 		}
 		return APIKeyDetails{}, fmt.Errorf("database query error %v", err)
 	}
 
-	return APIKeyDetails{}, nil
+	return keyDetails, nil
 }
 
 // StoreRegistrationData stores registration data in the database

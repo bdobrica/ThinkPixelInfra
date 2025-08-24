@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"api_gateway/auth"
-	"api_gateway/config"
 	"api_gateway/document_queue"
 	"api_gateway/logger"
 	"api_gateway/middleware"
@@ -49,10 +48,16 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create DocumentQueue object
+	dq := r.Context().Value(middleware.DocumentQueueKey).(*document_queue.DocumentQueue)
+	if dq == nil {
+		utils.RespondWithError(w, http.StatusServiceUnavailable, "DocumentQueue not found in context")
+		return
+	}
+
 	// Publish each document as a protobuf payload to the document queue
 	var failed int
 	var publishedIDs []int
-	subject := config.GetEnv("API_GATEWAY_DOCUMENT_QUEUE_SUBJECT", "store.jobs")
 	for _, item := range req {
 		payload := &document_queue.DocumentQueuePayload{
 			SiteId:          int32(cacheEntry.ID),
@@ -61,7 +66,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 			Extra:           item.Extra,
 			TimestampMillis: time.Now().UnixMilli(),
 		}
-		err := document_queue.Publish(subject, payload)
+		err := dq.Publish(payload)
 		if err != nil {
 			logger.Errorf("Failed to publish document to queue: %v", err)
 			failed++

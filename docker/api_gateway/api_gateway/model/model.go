@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"api_gateway/config"
@@ -111,17 +110,6 @@ func callModelAPIWithRetry(client *http.Client, textItems []TextItem, model stri
 // Returns an error if decoding fails or required metadata is missing.
 func decodeInferenceResponse(inferenceResponse InferenceResponse, embeddingsResponses *[]EmbeddingResponse) error {
 	for i, result := range inferenceResponse.Results {
-		offsetStr, ok := result.Metadata.Extra["Offset"]
-		if !ok {
-			logger.Errorf("Missing Offset in Metadata.Extra for item %d", i)
-			return fmt.Errorf("missing Offset in Metadata.Extra for item %d", i)
-		}
-		offset, err := strconv.Atoi(offsetStr)
-		if err != nil {
-			logger.Errorf("Invalid Offset value in Metadata.Extra for item %d: %v", i, err)
-			return fmt.Errorf("invalid Offset value in Metadata.Extra for item %d: %v", i, err)
-		}
-
 		decodedDenseVector, err := decodeFloatArray(result.DenseVector)
 		if err != nil {
 			logger.Errorf("Error decoding dense vector for item %d: %v", i, err)
@@ -136,7 +124,7 @@ func decodeInferenceResponse(inferenceResponse InferenceResponse, embeddingsResp
 		*embeddingsResponses = append(*embeddingsResponses, EmbeddingResponse{
 			ID:           result.Metadata.ID,
 			Text:         result.Text,
-			Offset:       offset,
+			Offset:       result.Offset,
 			DenseVector:  decodedDenseVector,
 			SparseVector: decodedSparseVector,
 		})
