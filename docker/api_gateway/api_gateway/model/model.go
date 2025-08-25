@@ -44,7 +44,9 @@ func truncateForLogging(o any) string {
 // Returns the decoded inference response or an error.
 func callModelAPI(client *http.Client, textItems []TextItem, model string, chunkSize, chunkOverlap int) (*InferenceResponse, error) {
 	requestPayload := InferenceRequest{
-		TextItems: textItems, // TODO: Add chunking logic here
+		TextItems:    textItems,
+		ChunkSize:    chunkSize,
+		ChunkOverlap: chunkOverlap,
 	}
 
 	requestBody, err := json.Marshal(requestPayload)
