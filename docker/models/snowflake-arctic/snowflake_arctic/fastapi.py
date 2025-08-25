@@ -44,7 +44,13 @@ import zmq.asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .config import LOG_LEVEL, MODEL_HTTP_PORT, MODEL_ZMQ_CLIENT_ADDR
+from .config import (
+    LOG_LEVEL,
+    MODEL_CHUNK_OVERLAP,
+    MODEL_CHUNK_SIZE,
+    MODEL_HTTP_PORT,
+    MODEL_ZMQ_CLIENT_ADDR,
+)
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -89,6 +95,8 @@ class InferenceRequest(BaseModel):
     """
 
     text_items: List[TextItem]
+    chunk_size: int = MODEL_CHUNK_SIZE
+    chunk_overlap: int = MODEL_CHUNK_OVERLAP
 
 
 class EmbeddingsItem(BaseModel):
@@ -187,8 +195,21 @@ async def ping_zmq_request(timeout: float = 1.0):
 
     # Prepare request data
     request_id = b"ping-request-" + os.urandom(4)  # Generate unique request ID
+    # Ping texts, one for every supported language English, French, German, Spanish, Italian, Romaanian
+    texts = [
+        "The quick brown fox jumps over the lazy dog.",
+        "Le renard brun rapide saute par-dessus le chien paresseux.",
+        "Der schnelle braune Fuchs springt über den faulen Hund.",
+        "El rápido zorro marrón salta sobre el perro perezoso.",
+        "La volpe marrone veloce salta sopra il cane pigro.",
+        "Vulpea maro rapidă sare peste câinele leneș.",
+    ]
     # Minimal request payload for pinging the model
-    request_data = {"text_items": [TextItem(text="ping", metadata=Metadata(id=0)).dict()]}
+    request_data = {
+        "text_items": [TextItem(text=text, metadata=Metadata(id=0)).model_dump() for text in texts],
+        "chunk_size": 0,
+        "chunk_overlap": 0,
+    }
 
     message = [request_id, b"", json.dumps(request_data).encode("utf-8")]
 
@@ -242,7 +263,11 @@ async def infer(request: InferenceRequest) -> InferenceResponse:
 
     # Prepare request data
     request_id = b"request-" + os.urandom(4)  # Generate unique request ID
-    request_data = {"text_items": [item.dict() for item in request.text_items]}
+    request_data = {
+        "text_items": [item.model_dump() for item in request.text_items],
+        "chunk_size": request.chunk_size,
+        "chunk_overlap": request.chunk_overlap,
+    }
 
     # Send request to ZMQ Dealer
     message = [request_id, b"", json.dumps(request_data).encode("utf-8")]

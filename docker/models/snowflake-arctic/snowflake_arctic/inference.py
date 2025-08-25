@@ -41,6 +41,8 @@ from transformers import AutoTokenizer
 from .config import (
     LOCAL,
     LOG_LEVEL,
+    MODEL_CHUNK_OVERLAP,
+    MODEL_CHUNK_SIZE,
     MODEL_DEVICE,
     MODEL_NUM_WORKERS,
     MODEL_PATH,
@@ -97,8 +99,8 @@ def _process_task(context: zmq.Context):
             # Parse the request
             data = json.loads(request)
             text_items = data.get("text_items", [])
-            chunk_size = data.get("chunk_size", 1000)
-            chunk_overlap = data.get("chunk_overlap", 200)
+            chunk_size = data.get("chunk_size", MODEL_CHUNK_SIZE)
+            chunk_overlap = data.get("chunk_overlap", MODEL_CHUNK_OVERLAP)
 
             if not text_items:
                 raise EmptyBatchError("No text items provided for inference.")

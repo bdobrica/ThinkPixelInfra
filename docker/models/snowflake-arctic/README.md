@@ -5,12 +5,14 @@ The [Snowflake Arctic](https://huggingface.co/Snowflake/snowflake-arctic-embed-l
 ## Environment Variables
 
 - `LOCAL`: If set, the Embedding Model will run locally. Default: `false`
-- `MODEL_PATH`: Path to the model weights. Default: `/app/snowflake-arctic-embed-l-v2`
+- `MODEL_CHUNK_OVERLAP`: Overlap between text chunks. Default: `200`
+- `MODEL_CHUNK_SIZE`: Size of text chunks for processing. Default: `1000`. Set to `0` to disable splitting and return entire text
 - `MODEL_DEVICE`: Device to run the model on. The model is saved in ONNX format and optimised for CPU. Default: `cpu`
-- `MODEL_ZMQ_CLIENT_ADDR`: ZMQ socket address where FastAPI threads are connecting to. Default: `ipc:///tmp/snowflake-arctic.client`
-- `MODEL_ZMQ_WORKER_ADDR`: ZMQ socket address where the Model Workers are connecting to. Default: `ipc:///tmp/snowflake-arctic.worker`
 - `MODEL_HTTP_PORT`: HTTP port for the model. Default: `8000`
 - `MODEL_NUM_WORKERS`: Number of workers for the model. Default: cpu count / 2
+- `MODEL_PATH`: Path to the model weights. Default: `/app/snowflake-arctic-embed-l-v2`
+- `MODEL_ZMQ_CLIENT_ADDR`: ZMQ socket address where FastAPI threads are connecting to. Default: `ipc:///tmp/snowflake-arctic.client`
+- `MODEL_ZMQ_WORKER_ADDR`: ZMQ socket address where the Model Workers are connecting to. Default: `ipc:///tmp/snowflake-arctic.worker`
 
 ## Weight Files
 

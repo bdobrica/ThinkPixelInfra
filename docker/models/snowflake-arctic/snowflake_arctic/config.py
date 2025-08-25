@@ -41,6 +41,8 @@ MODEL_ZMQ_CLIENT_ADDR: str = os.getenv("MODEL_ZMQ_CLIENT_ADDR", "ipc:///tmp/snow
 MODEL_ZMQ_WORKER_ADDR: str = os.getenv("MODEL_ZMQ_WORKER_ADDR", "ipc:///tmp/snowflake-arctic.worker")
 MODEL_HTTP_PORT: int = int(os.getenv("MODEL_HTTP_PORT", 8000))
 MODEL_NUM_WORKERS: int = max(1, int(os.getenv("MODEL_NUM_WORKERS", cpu_count() // 2)))
+MODEL_CHUNK_SIZE: int = int(os.getenv("MODEL_CHUNK_SIZE", 1000))
+MODEL_CHUNK_OVERLAP: int = int(os.getenv("MODEL_CHUNK_OVERLAP", 200))
 
 # Logging
 LOG_LEVEL: int = logging.DEBUG if LOCAL else logging.WARNING

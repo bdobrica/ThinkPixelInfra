@@ -43,15 +43,17 @@ class TextSplitter(Iterator):
     between chunks and handles edge cases like single long sentences.
 
     The chunking algorithm follows these rules:
-    1. If text <= chunk_size, return as single chunk
-    2. Split into sentences using spaCy
-    3. Build chunks by adding sentences until approaching chunk_size
-    4. For subsequent chunks, include overlap from previous sentences
-    5. Always include at least one sentence per chunk, even if it exceeds chunk_size
+    1. If chunk_size is 0, return entire text without splitting
+    2. If text <= chunk_size, return as single chunk
+    3. Split into sentences using spaCy
+    4. Build chunks by adding sentences until approaching chunk_size
+    5. For subsequent chunks, include overlap from previous sentences
+    6. Always include at least one sentence per chunk, even if it exceeds chunk_size
 
     Args:
         language_model (LanguageModel): Initialized language model for the text
-        chunk_size (int): Maximum characters per chunk (default: 1000)
+        chunk_size (int): Maximum characters per chunk (default: 1000).
+                         Set to 0 to disable splitting and return entire text.
         chunk_overlap (int): Maximum characters to overlap between chunks (default: 200)
 
     Raises:
@@ -62,6 +64,11 @@ class TextSplitter(Iterator):
         >>> splitter = TextSplitter(language_model, chunk_size=500, chunk_overlap=100)
         >>> for offset, chunk in splitter:
         ...     print(f"Chunk at {offset}: {len(chunk)} chars")
+        >>>
+        >>> # No splitting example
+        >>> no_split = TextSplitter(language_model, chunk_size=0)
+        >>> for offset, chunk in no_split:
+        ...     print(f"Full text at {offset}: {len(chunk)} chars")
     """
 
     def __init__(self, language_model: LanguageModel, chunk_size: int = 1000, chunk_overlap: int = 200):
@@ -71,6 +78,7 @@ class TextSplitter(Iterator):
         Args:
             language_model (LanguageModel): Initialized language model for processing text
             chunk_size (int, optional): Maximum characters per chunk. Defaults to 1000.
+                                       Set to 0 to disable splitting and return entire text.
             chunk_overlap (int, optional): Maximum characters to overlap between chunks.
                                          Defaults to 200.
 
@@ -203,10 +211,11 @@ class TextSplitter(Iterator):
         Return the next chunk of text with its character offset.
 
         Implements the core chunking algorithm:
-        1. If text is smaller than chunk_size, return the entire text
-        2. Build chunks by adding sentences until approaching chunk_size
-        3. Include overlap from previous chunks when possible
-        4. Handle single long sentences that exceed chunk_size
+        1. If chunk_size is 0, return the entire text without splitting
+        2. If text is smaller than chunk_size, return the entire text
+        3. Build chunks by adding sentences until approaching chunk_size
+        4. Include overlap from previous chunks when possible
+        5. Handle single long sentences that exceed chunk_size
 
         Returns:
             Tuple[int, str]: A tuple containing:
@@ -216,6 +225,13 @@ class TextSplitter(Iterator):
         Raises:
             StopIteration: When there are no more chunks to return
         """
+        # Check if chunk_size is 0 - no splitting, return entire text
+        if self.chunk_size == 0:
+            if self.current_sentence_index > 0:
+                raise StopIteration
+            self.current_sentence_index = 1
+            return 0, self.language_model.text
+
         # Check if text is smaller than chunk_size - no chunking needed
         if len(self.language_model.text) <= self.chunk_size:
             if self.current_sentence_index > 0:

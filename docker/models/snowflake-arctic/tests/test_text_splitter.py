@@ -7,6 +7,22 @@ from snowflake_arctic.language import LanguageModel
 from snowflake_arctic.text_splitter import TextSplitter
 
 
+def test_chunk_size_zero_no_splitting():
+    """Test that setting chunk_size to 0 returns the entire text without splitting"""
+    text = "First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence."
+    language_model = LanguageModel(text)
+    splitter = TextSplitter(language_model, chunk_size=0, chunk_overlap=50)
+
+    chunks = list(splitter)
+
+    # Assertions
+    assert len(chunks) == 1, "chunk_size=0 should produce exactly one chunk"
+    offset, chunk = chunks[0]
+    assert offset == 0, "Single chunk should start at offset 0"
+    assert chunk == text, "Single chunk should contain the entire text"
+    assert len(chunk) == len(text), "Chunk length should match original text length"
+
+
 def test_small_text_no_chunking():
     """Test that small text (< chunk_size) is not chunked"""
     text = "This is a short text. It has two sentences."

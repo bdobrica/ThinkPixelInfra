@@ -15,7 +15,9 @@ type TextItem struct {
 
 // InferenceRequest is the request payload for the model API.
 type InferenceRequest struct {
-	TextItems []TextItem `json:"text_items"` // List of text items to process
+	TextItems    []TextItem `json:"text_items"`    // List of text items to process
+	ChunkSize    int        `json:"chunk_size"`    // Size of text chunks
+	ChunkOverlap int        `json:"chunk_overlap"` // Overlap between chunks
 }
 
 // EmbeddingsItem represents a single result from the model API, with encoded vectors and metadata.
