@@ -9,14 +9,27 @@ RUN /opt/weights.sh
 
 FROM python:3.10-slim-bookworm
 
-ENV VERSION="0.2.1"
-
-RUN apt-get update && rm -rf /var/lib/apt/lists/*
+ARG TARGETPLATFORM
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM} \
+    apt-get update
 RUN mkdir /app
 WORKDIR /app
+
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    python -m spacy download en_core_web_sm \
+    && python -m spacy download fr_core_news_sm \
+    && python -m spacy download de_core_news_sm \
+    && python -m spacy download es_core_news_sm \
+    && python -m spacy download it_core_news_sm \
+    && python -m spacy download ro_core_news_sm
+
 COPY --from=weights /opt/weights/mpnetv2/mpnet-base-v2 /app/mpnet-base-v2
 COPY mpnetv2 mpnetv2
+
+ENV VERSION="0.3.0"
 
 CMD ["python", "-m", "mpnetv2"]
