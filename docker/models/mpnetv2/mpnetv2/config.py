@@ -29,8 +29,18 @@ Example:
 
 import logging
 import os
+from typing import List
 
 from torch.multiprocessing import cpu_count
+
+SPACY_LANGUAGE_MODELS = {
+    "en": "en_core_web_sm",
+    "fr": "fr_core_news_sm",
+    "de": "de_core_news_sm",
+    "es": "es_core_news_sm",
+    "it": "it_core_news_sm",
+    "ro": "ro_core_news_sm",
+}
 
 # Environment Variables
 LOCAL: bool = os.getenv("LOCAL", "false").lower() in {
@@ -48,7 +58,13 @@ MODEL_HTTP_PORT: int = int(os.getenv("MODEL_HTTP_PORT", 8000))
 MODEL_NUM_WORKERS: int = max(1, int(os.getenv("MODEL_NUM_WORKERS", cpu_count() // 2)))
 MODEL_CHUNK_SIZE: int = int(os.getenv("MODEL_CHUNK_SIZE", 1000))
 MODEL_CHUNK_OVERLAP: int = int(os.getenv("MODEL_CHUNK_OVERLAP", 200))
-
+MODEL_LANGUAGES: List[str] = list(
+    filter(
+        lambda item: item in SPACY_LANGUAGE_MODELS,
+        os.getenv("MODEL_LANGUAGES", "en").split(","),
+    )
+)
+MODEL_LANGUAGE_DETECTION_PATH: str = os.getenv("MODEL_LANGUAGE_DETECTION_PATH", "/app/fasttext/lid.176.bin")
 
 # Logging
 LOG_LEVEL: int = logging.DEBUG if LOCAL else logging.WARNING

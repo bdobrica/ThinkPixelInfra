@@ -44,8 +44,9 @@ from typing import List
 import uvicorn
 import zmq
 import zmq.asyncio
-from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+from fastapi import FastAPI, HTTPException
 
 from .config import (
     LOG_LEVEL,
@@ -121,6 +122,7 @@ class InferenceRequest(BaseModel):
     """
 
     text_items: List[TextItem]
+    language: str = "auto"
     chunk_size: int = MODEL_CHUNK_SIZE
     chunk_overlap: int = MODEL_CHUNK_OVERLAP
 
