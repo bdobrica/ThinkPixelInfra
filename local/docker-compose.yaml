@@ -38,17 +38,17 @@ services:
     ports:
       - "6333:6333"
 
-  # mpnetv2:
-  #   build:
-  #     context: ../docker/models/mpnetv2
-  #     dockerfile: Dockerfile
-  #   container_name: model
-  #   volumes:
-  #     - ../docker/models/weights/mpnetv2/mpnet-base-v2:/app/mpnet-base-v2
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - LOCAL=1
+  mpnetv2:
+    build:
+      context: ../docker/models/mpnetv2
+      dockerfile: Dockerfile
+    container_name: model
+    #volumes:
+    #  - ../docker/models/weights/mpnetv2/mpnet-base-v2:/app/mpnet-base-v2
+    ports:
+      - "8000:8000"
+    environment:
+      - LOCAL=1
 
   snowflake-arctic:
     build:
@@ -97,7 +97,8 @@ services:
       - mysql
       - qdrant
       - nats
-      - snowflake-arctic
+      - mpnetv2
+      #- snowflake-arctic
 
   mock-site:
     build:

@@ -6,6 +6,7 @@ BASE_URL="https://ublo.ro/wp-content/mirror"
 # Define the files to download
 # Used: `split -b 200M pytorch_model.bin pytorch_model.bin.`
 FILES="\
+fasttext/lid.176.bin \
 mpnetv2/mpnet-base-v2/config.json \
 mpnetv2/mpnet-base-v2/pytorch_model.bin.aa \
 mpnetv2/mpnet-base-v2/pytorch_model.bin.ab \
