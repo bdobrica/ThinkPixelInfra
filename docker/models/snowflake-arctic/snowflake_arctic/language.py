@@ -28,14 +28,19 @@ import re
 import time
 import unicodedata
 from functools import cached_property, lru_cache
-from typing import Union
+from typing import Dict, Union
 
+import fasttext
 import spacy
-from fast_langdetect import detect
 from spacy.tokens import Doc
 from spacy.vocab import Vocab
 
-from .config import LOG_LEVEL
+from .config import (
+    LOG_LEVEL,
+    MODEL_LANGUAGE_DETECTION_PATH,
+    MODEL_LANGUAGES,
+    SPACY_LANGUAGE_MODELS,
+)
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -84,6 +89,36 @@ class UnknownLanguage(spacy.language.Language):
         return doc
 
 
+class LanguageDetector:
+    LANG_DETECT_MAX_LENGTH = 100
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def load():
+        return fasttext.load_model(MODEL_LANGUAGE_DETECTION_PATH)
+
+    @staticmethod
+    def prepare_text_for_language_detection(text: str) -> str:
+        text_ = re.sub(r"\s+", " ", text.lower().strip())
+        text_ = text_[: LanguageDetector.LANG_DETECT_MAX_LENGTH]
+        last_space_pos = text_.rfind(" ")
+        if last_space_pos != -1:
+            text_ = text_[:last_space_pos]
+        return text_
+
+    @staticmethod
+    def detect(text: str) -> Dict[str, Union[str, float]]:
+        model = LanguageDetector.load()
+        text = LanguageDetector.prepare_text_for_language_detection(text)
+        predictions = model.predict(text, k=1)
+        if not predictions or not predictions[0]:
+            return {}
+
+        lang = predictions[0][0].removeprefix("__label__")
+        score = predictions[1][0]
+        return {"lang": lang, "score": score}
+
+
 class LanguageModel:
     # Fast LangDetect max length for language detection
     LANG_DETECT_MAX_LENGTH = 100
@@ -92,14 +127,7 @@ class LanguageModel:
     UNKNOWN_LANGUAGE = "unk"
 
     # Define the allowed languages and corresponding spaCy small models.
-    ALLOWED_LANGUAGES = {
-        "en": "en_core_web_sm",
-        "fr": "fr_core_news_sm",
-        "de": "de_core_news_sm",
-        "es": "es_core_news_sm",
-        "it": "it_core_news_sm",
-        "ro": "ro_core_news_sm",
-    }
+    ALLOWED_LANGUAGES = {lang: SPACY_LANGUAGE_MODELS[lang] for lang in MODEL_LANGUAGES if lang in SPACY_LANGUAGE_MODELS}
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -121,21 +149,14 @@ class LanguageModel:
 
         return nlp
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, language: str = "auto"):
         """
         Initializes the LanguageModel with the given text.
         Detects the language and loads the corresponding spaCy model.
         """
         self.text = text
+        self.language_ = language
         self.logger = logging.getLogger(__class__.__name__)
-
-    def _prepare_text_for_language_detection(self) -> str:
-        text_ = re.sub(r"\s+", " ", self.text.lower().strip())
-        text_ = text_[: self.LANG_DETECT_MAX_LENGTH]
-        last_space_pos = text_.rfind(" ")
-        if last_space_pos != -1:
-            text_ = text_[:last_space_pos]
-        return text_
 
     def _detect_language(self) -> str:
         """
@@ -143,9 +164,9 @@ class LanguageModel:
         Expects fast_langdetect.detect to return a dict with 'lang' and 'score'.
         """
         start_time = time.perf_counter()
-        text_ = self._prepare_text_for_language_detection()
-        result = detect(text_)
+        result = LanguageDetector.detect(self.text)
         elapsed_time = time.perf_counter() - start_time
+
         score = float(result.get("score", 0))
         lang = str(result.get("lang", self.UNKNOWN_LANGUAGE))
 
@@ -188,7 +209,7 @@ class LanguageModel:
         """
         Returns the text truncated to the maximum length for language detection.
         """
-        truncated_text = self._prepare_text_for_language_detection()
+        truncated_text = LanguageDetector.prepare_text_for_language_detection(self.text)
         if len(truncated_text) < len(self.text):
             truncated_text += "..."
         return truncated_text
@@ -198,7 +219,19 @@ class LanguageModel:
         """
         Detects the language of the text using fast_langdetect.
         """
-        return self._detect_language()
+        if self.language_ == "auto":
+            return self._detect_language()
+
+        if self.language_ in self.ALLOWED_LANGUAGES:
+            return self.language_
+        else:
+            self.logger.warning(
+                "Provided language `%s` is not in allowed languages: %s, falling back to `%s`",
+                self.language_,
+                self.ALLOWED_LANGUAGES.keys(),
+                self.UNKNOWN_LANGUAGE,
+            )
+            return self.UNKNOWN_LANGUAGE
 
     @cached_property
     def nlp(self) -> spacy.language.Language:
