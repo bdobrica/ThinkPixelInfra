@@ -121,6 +121,7 @@ class InferenceRequest(BaseModel):
     """
 
     text_items: List[TextItem]
+    language: str = "auto"
     chunk_size: int = MODEL_CHUNK_SIZE
     chunk_overlap: int = MODEL_CHUNK_OVERLAP
 

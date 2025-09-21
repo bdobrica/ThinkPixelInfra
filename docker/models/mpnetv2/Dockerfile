@@ -28,8 +28,9 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
     && python -m spacy download ro_core_news_sm
 
 COPY --from=weights /opt/weights/mpnetv2/mpnet-base-v2 /app/mpnet-base-v2
+COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY mpnetv2 mpnetv2
 
-ENV VERSION="0.3.0"
+ENV VERSION="0.3.1"
 
 CMD ["python", "-m", "mpnetv2"]
