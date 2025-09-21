@@ -31,6 +31,6 @@ COPY --from=weights /opt/weights/mpnetv2/mpnet-base-v2 /app/mpnet-base-v2
 COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY mpnetv2 mpnetv2
 
-ENV VERSION="0.3.1"
+ENV VERSION="0.3.2"
 
 CMD ["python", "-m", "mpnetv2"]
