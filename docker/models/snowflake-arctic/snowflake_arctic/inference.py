@@ -101,13 +101,19 @@ def _process_task(context: zmq.Context):
             text_items = data.get("text_items", [])
             chunk_size = data.get("chunk_size", MODEL_CHUNK_SIZE)
             chunk_overlap = data.get("chunk_overlap", MODEL_CHUNK_OVERLAP)
+            language = data.get("language", "auto")
 
             if not text_items:
                 raise EmptyBatchError("No text items provided for inference.")
 
             logger.debug("Received %s text items for inference.", len(text_items))
 
-            text_items = prepare_text_items(text_items, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            text_items = prepare_text_items(
+                text_items,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                language=language,
+            )
 
             if not text_items:
                 raise EmptyBatchError("No valid text items after preparation.")

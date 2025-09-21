@@ -95,6 +95,13 @@ class TextSplitter(Iterator):
         self.current_sentence_index = 0
 
     @cached_property
+    def _skip_chunking(self) -> bool:
+        """
+        Determine if the text requires chunking based on its length and chunking parameters.
+        """
+        return self.chunk_size < 1 or len(self.language_model.text) <= self.chunk_size
+
+    @cached_property
     def _sentences(self) -> Tuple[Tuple[str, int, int], ...]:
         """
         Splits the text into sentences using the loaded spaCy model.
@@ -198,12 +205,17 @@ class TextSplitter(Iterator):
         Returns:
             TextSplitter: Self reference for iterator protocol
         """
+        # Reset start index for iteration
+        self.current_sentence_index = 0
+
+        if self._skip_chunking:
+            self.logger.info("No chunking needed.")
+            return self
+
         if not self._sentences:
             self.logger.warning("No sentences found in the text.")
             return self
 
-        # Reset start index for iteration
-        self.current_sentence_index = 0
         return self
 
     def __next__(self) -> Tuple[int, str]:
@@ -226,14 +238,7 @@ class TextSplitter(Iterator):
             StopIteration: When there are no more chunks to return
         """
         # Check if chunk_size is 0 - no splitting, return entire text
-        if self.chunk_size == 0:
-            if self.current_sentence_index > 0:
-                raise StopIteration
-            self.current_sentence_index = 1
-            return 0, self.language_model.text
-
-        # Check if text is smaller than chunk_size - no chunking needed
-        if len(self.language_model.text) <= self.chunk_size:
+        if self._skip_chunking:
             if self.current_sentence_index > 0:
                 raise StopIteration
             self.current_sentence_index = 1

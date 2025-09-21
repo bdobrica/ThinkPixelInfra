@@ -5,6 +5,7 @@ BASE_URL="https://ublo.ro/wp-content/mirror"
 
 # Define the files to download
 FILES="\
+fasttext/lid.176.bin \
 snowflake-arctic/snowflake-arctic-embed-l-v2.0/model.onnx \
 snowflake-arctic/snowflake-arctic-embed-l-v2.0/model.onnx_data.aa \
 snowflake-arctic/snowflake-arctic-embed-l-v2.0/model.onnx_data.ab \
@@ -68,7 +69,7 @@ for FILE in $FILES; do
         echo "File already exists: $DEST"
         continue
     fi
-    
+
     # Download it
     echo "Downloading $URL to $DEST..."
     curl -fSL "$URL" -o "$DEST"

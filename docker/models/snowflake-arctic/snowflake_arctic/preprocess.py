@@ -14,7 +14,12 @@ from .language import LanguageModel
 from .text_splitter import TextSplitter
 
 
-def prepare_text_items(text_items: list, chunk_size: int = 1000, chunk_overlap: int = 200) -> list:
+def prepare_text_items(
+    text_items: list,
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
+    language: str = "auto",
+) -> list:
     """
     Prepare a batch of text items for processing by splitting them into chunks.
 
@@ -28,6 +33,8 @@ def prepare_text_items(text_items: list, chunk_size: int = 1000, chunk_overlap: 
         chunk_size (int, optional): Maximum characters per chunk. Defaults to 1000.
         chunk_overlap (int, optional): Maximum characters to overlap between chunks.
                                      Defaults to 200.
+        language (str, optional): Language code for the text (e.g., 'en', 'fr').
+                                  If 'auto', the language will be detected automatically.
 
     Returns:
         list: List of processed text items with chunks. Each item contains:
@@ -50,7 +57,7 @@ def prepare_text_items(text_items: list, chunk_size: int = 1000, chunk_overlap: 
             continue
 
         # Initialize the TextSplitter with the language model
-        language_model = LanguageModel(text)
+        language_model = LanguageModel(text=text, language=language)
         splitter = TextSplitter(
             language_model=language_model,
             chunk_size=chunk_size,
