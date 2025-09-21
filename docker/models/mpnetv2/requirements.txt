@@ -1,10 +1,10 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 fastapi[standard]
-uvicorn
+fasttext-predict
+protobuf
 pyyaml
 pyzmq
+spacy
 torch>=2.6.0 # required due to https://nvd.nist.gov/vuln/detail/CVE-2025-32434
 transformers[torch]
-protobuf
-fasttext-predict
-spacy
+uvicorn

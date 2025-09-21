@@ -302,6 +302,7 @@ async def infer(request: InferenceRequest) -> InferenceResponse:
         "text_items": [item.model_dump() for item in request.text_items],
         "chunk_size": request.chunk_size,
         "chunk_overlap": request.chunk_overlap,
+        "language": request.language,
     }
 
     # Send request to ZMQ Dealer
