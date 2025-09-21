@@ -44,9 +44,8 @@ from typing import List
 import uvicorn
 import zmq
 import zmq.asyncio
-from pydantic import BaseModel
-
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from .config import (
     LOG_LEVEL,
