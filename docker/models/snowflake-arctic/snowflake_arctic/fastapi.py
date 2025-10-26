@@ -1,34 +1,37 @@
 """
 FastAPI server module for Snowflake Arctic embedding model inference.
 
-This module provides a FastAPI-based HTTP server that exposes endpoints for
-text embedding generation using the Snowflake Arctic model. It handles text
-preprocessing, communicates with the inference backend via ZeroMQ, and returns
-structured embedding results.
+This module provides a REST API interface for the Snowflake Arctic embeddings,
+handling HTTP requests and communicating with inference workers via ZMQ.
+The server supports text chunking, multi-language processing, and provides
+health check endpoints.
 
-The server provides two main endpoints:
-- /infer: Generate embeddings for text items
-- /ping: Health check endpoint
+Key Features:
+- RESTful API with automatic request/response validation
+- Asynchronous ZMQ communication with inference workers
+- Configurable text chunking with overlap support
+- Multi-language text processing capabilities
+- Health check endpoint with model readiness verification
+- Comprehensive error handling and logging
 
-The inference pipeline:
-1. Receives text items via HTTP POST
-2. Forwards requests to ZeroMQ inference workers
-3. Returns dense and sparse embeddings with metadata
+API Endpoints:
+    POST /infer: Generate embeddings for text items with optional chunking
+    GET /ping: Health check endpoint for service monitoring
 
-Models:
-    Metadata: Metadata structure for text items
-    TextItem: Input text item with metadata
-    InferenceRequest: Request containing list of text items
-    EmbeddingsItem: Output embedding item with vectors and metadata
-    InferenceResponse: Response containing embedding results and latency
-    SuccessResponse: Simple success response for health checks
+Request/Response Models:
+    - InferenceRequest: Text items with optional chunking parameters
+    - InferenceResponse: Embeddings with metadata and latency information
+    - TextItem: Individual text with metadata
+    - EmbeddingsItem: Text chunk with dense vector embedding and metadata
 
-Functions:
-    fastapi_server: Main function to start the FastAPI server
-    infer: Endpoint for text embedding inference
-    ping: Health check endpoint
-    create_zmq_context: Initialize ZeroMQ context
-    ping_zmq_request: Helper for ZeroMQ health checks
+Example:
+    >>> import requests
+    >>> response = requests.post('http://localhost:8000/infer', json={
+    ...     'text_items': [{'text': 'Hello world', 'metadata': {'id': 1}}],
+    ...     'chunk_size': 1000,
+    ...     'chunk_overlap': 200
+    ... })
+    >>> embeddings = response.json()['results']
 """
 
 import json
@@ -62,11 +65,17 @@ ready = False
 
 class Metadata(BaseModel):
     """
-    Metadata structure for text items containing ID and additional fields.
+    Metadata container for text items and embeddings.
+
+    Contains identification and additional context information that gets
+    preserved throughout the processing pipeline.
 
     Attributes:
         id (int): Unique identifier for the text item
-        extra (dict): Additional metadata fields (default: empty dict)
+        extra (dict): Additional metadata fields, automatically populated with:
+            - offset: Character offset in original text (for chunks)
+            - language: Detected language code
+            - language_model: LanguageModel instance (internal use)
     """
 
     id: int
@@ -75,11 +84,15 @@ class Metadata(BaseModel):
 
 class TextItem(BaseModel):
     """
-    Input text item for embedding generation.
+    Individual text item for embedding generation.
+
+    Represents a single piece of text with associated metadata that will
+    be processed for embedding generation. Long texts may be automatically
+    split into chunks based on request parameters.
 
     Attributes:
-        text (str): Text content to be embedded
-        metadata (Metadata): Associated metadata including ID and extra fields
+        text (str): The text content to generate embeddings for
+        metadata (Metadata): Associated metadata for the text item
     """
 
     text: str
@@ -88,10 +101,23 @@ class TextItem(BaseModel):
 
 class InferenceRequest(BaseModel):
     """
-    Request payload for text embedding inference.
+    Request model for text embedding inference.
+
+    Contains text items and optional chunking parameters for processing.
+    Chunking allows long texts to be split into manageable pieces while
+    maintaining context through configurable overlap.
 
     Attributes:
-        text_items (List[TextItem]): List of text items to be embedded
+        text_items (List[TextItem]): List of text items to process
+        chunk_size (int): Maximum characters per chunk (default from config)
+        chunk_overlap (int): Character overlap between chunks (default from config)
+
+    Example:
+        >>> request = InferenceRequest(
+        ...     text_items=[TextItem(text="Long text...", metadata=Metadata(id=1))],
+        ...     chunk_size=1000,
+        ...     chunk_overlap=200
+        ... )
     """
 
     text_items: List[TextItem]
@@ -102,18 +128,18 @@ class InferenceRequest(BaseModel):
 
 class EmbeddingsItem(BaseModel):
     """
-    Embedding result item containing text, vectors, and metadata.
+    Individual embedding result with text chunk and dense vector.
 
-    This model represents a single embedding result with the original text,
-    dense and sparse vector representations, character offset information,
-    and associated metadata.
+    Represents the embedding output for a single text chunk, including
+    the processed text, its position in the original document, and the
+    base64-encoded dense vector embedding.
 
     Attributes:
-        text (str): Original text that was embedded
-        offset (int): Character offset of this text chunk in the original document
-        dense_vector (str): Base64-encoded dense embedding vector
+        text (str): The text chunk that was embedded
+        offset (int): Character offset of this chunk in the original text
+        dense_vector (str): Base64-encoded dense vector embedding
         sparse_vector (Dict[str, str]): Sparse vector representation as hash->weight mapping
-        metadata (Metadata): Associated metadata including ID and extra fields
+        metadata (Metadata): Original metadata plus processing information
     """
 
     text: str
@@ -125,11 +151,14 @@ class EmbeddingsItem(BaseModel):
 
 class InferenceResponse(BaseModel):
     """
-    Response payload containing embedding results and performance metrics.
+    Response model containing embedding results and performance metrics.
+
+    Contains all embedding results for the processed text items along
+    with timing information for performance monitoring.
 
     Attributes:
-        results (List[EmbeddingsItem]): List of embedding results for each input text
-        latency (float): Request processing time in seconds (default: 0.0)
+        results (List[EmbeddingsItem]): List of embedding results
+        latency (float): Request processing time in seconds
     """
 
     results: List[EmbeddingsItem]
@@ -138,11 +167,11 @@ class InferenceResponse(BaseModel):
 
 class SuccessResponse(BaseModel):
     """
-    Simple success response for health check endpoints.
+    Simple success response for health checks and status endpoints.
 
     Attributes:
-        success (bool): Success status (default: True)
-        version (str): Application version from VERSION environment variable
+        success (bool): Always True for successful responses
+        version (str): Service version from environment variable
     """
 
     success: bool = True
@@ -152,14 +181,13 @@ class SuccessResponse(BaseModel):
 @lru_cache(maxsize=None)
 def create_zmq_context():
     """
-    Initialize and cache the ZeroMQ async context for communication with inference workers.
+    Create and cache ZMQ context for communication with inference workers.
 
-    This function creates a global ZeroMQ async context that is used throughout
-    the application for communicating with the inference backend. The context
-    is cached to ensure only one instance exists.
+    Uses LRU cache to ensure only one context is created per process,
+    which is important for ZMQ resource management and performance.
 
     Global Variables:
-        context: ZMQ async context for socket operations
+        context: ZMQ async context for socket communication
     """
     global context
 
@@ -170,11 +198,11 @@ def create_zmq_context():
 
 async def ping_zmq_request(timeout: float = 1.0):
     """
-    Send a health check request to the ZeroMQ inference worker.
+    Send a ping request to inference workers to verify service health.
 
-    This helper function sends a minimal ping request to the inference backend
-    to verify connectivity and worker availability. It's used by the ping endpoint
-    to check system health.
+    Sends a minimal inference request with sample texts in multiple languages
+    to verify that the inference workers are responsive and the model is loaded.
+    This is used by the health check endpoint.
 
     Args:
         timeout (float): Request timeout in seconds (default: 1.0)
@@ -183,8 +211,8 @@ async def ping_zmq_request(timeout: float = 1.0):
         bool: True if ping successful, False otherwise
 
     Note:
-        Creates a temporary REQ socket for the ping operation and closes it
-        after receiving the response or timing out.
+        Uses sample texts in English, French, German, Spanish, Italian, and
+        Romanian to test multi-language support.
     """
     global context
 
@@ -232,25 +260,33 @@ async def ping_zmq_request(timeout: float = 1.0):
 
 async def infer(request: InferenceRequest) -> InferenceResponse:
     """
-    Inference endpoint to generate embeddings for text items.
+    Generate embeddings for text items with automatic chunking and language detection.
 
-    This endpoint processes text embedding requests by forwarding them to the
-    ZeroMQ inference workers and returning the results. It handles the complete
-    pipeline from HTTP request to embedding generation.
+    This endpoint processes text items through the complete embedding pipeline:
+    1. Automatic language detection for each text item
+    2. Intelligent text chunking with sentence boundary preservation
+    3. Dense vector embedding generation using MPNetv2
+    4. Metadata preservation and enrichment
+
+    The function communicates asynchronously with inference workers via ZMQ,
+    allowing for horizontal scaling and load distribution.
 
     Args:
-        request (InferenceRequest): Request containing text items to embed
+        request (InferenceRequest): Request containing text items and chunking parameters
 
-        Returns:
-        InferenceResponse: Response containing:
-            - results: List of EmbeddingsItem with text, offset, dense_vector,
-                      sparse_vector, and metadata
-            - latency: Processing time in seconds    Raises:
-        HTTPException: 500 error if inference fails or worker returns error
+    Returns:
+        InferenceResponse: Embeddings with metadata and latency information
 
-    Note:
-        Each result item now includes the offset field at the top level,
-        extracted from the metadata.extra field during postprocessing.
+    Raises:
+        HTTPException: 500 error if inference fails or workers are unavailable
+
+    Example:
+        >>> request = InferenceRequest(
+        ...     text_items=[TextItem(text="Hello world", metadata=Metadata(id=1))],
+        ...     chunk_size=1000
+        ... )
+        >>> response = await infer(request)
+        >>> print(f"Generated {len(response.results)} embeddings")
     """
     global context
 
@@ -295,22 +331,26 @@ async def infer(request: InferenceRequest) -> InferenceResponse:
 
 async def ping() -> SuccessResponse:
     """
-    Health check endpoint to verify system availability.
+    Health check endpoint for service monitoring and readiness verification.
 
-    This endpoint checks the health of the embedding system by attempting
-    to communicate with the ZeroMQ inference workers. It implements a simple
-    caching mechanism to avoid excessive health checks.
+    This endpoint verifies that the entire embedding service is operational:
+    - ZMQ communication with inference workers is functioning
+    - Model is loaded and responsive
+    - Multi-language processing capabilities are available
+
+    The endpoint uses a caching mechanism to avoid repeated health checks
+    once the service is confirmed healthy, improving performance for
+    frequent monitoring requests.
 
     Returns:
-        SuccessResponse: Success response with version information
+        SuccessResponse: Success status and version information
 
     Raises:
-        HTTPException: 500 error if ping fails within timeout
+        HTTPException: 500 error if service is not ready or workers are unresponsive
 
-    Behavior:
-        - Returns immediately if already marked as ready
-        - Attempts ZMQ ping with 1-second timeout
-        - Caches successful ping result to avoid repeated checks
+    Note:
+        On first successful ping, the service is marked as ready and subsequent
+        calls return immediately without additional worker communication.
     """
     global ready
 
@@ -334,24 +374,26 @@ async def ping() -> SuccessResponse:
 
 def fastapi_server():
     """
-    Start the FastAPI server for Snowflake Arctic embedding inference.
+    Start the FastAPI HTTP server for the MPNetv2 embedding service.
 
-    This function initializes and starts the FastAPI application server with
-    the inference and health check endpoints. It sets up the ZeroMQ context
-    for backend communication and ensures proper cleanup on shutdown.
+    Creates and configures a FastAPI application with embedding and health check
+    endpoints, initializes ZMQ communication, and starts the HTTP server.
+
+    The server provides:
+    - POST /infer: Text embedding generation with chunking support
+    - GET /ping: Health check and readiness verification
 
     Server Configuration:
-        - Host: 0.0.0.0 (all interfaces)
-        - Port: Configured via MODEL_HTTP_PORT environment variable
-        - Log Level: Configured via LOG_LEVEL environment variable
+    - Host: 0.0.0.0 (accepts connections from all interfaces)
+    - Port: Configured via MODEL_HTTP_PORT environment variable
+    - Log Level: Configured via LOG_LEVEL setting
 
-    Endpoints:
-        - POST /infer: Text embedding inference
-        - GET /ping: Health check
+    The function handles ZMQ context cleanup on shutdown to ensure
+    proper resource management.
 
     Note:
-        The server runs until interrupted and properly terminates the ZMQ
-        context during shutdown.
+        This function blocks until the server is shut down. It should be
+        run in a separate process in production deployments.
     """
     app = FastAPI()
     _ = app.post("/infer")(infer)
