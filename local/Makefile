@@ -141,6 +141,10 @@ test-api: ## Test API endpoints
 	@echo "$(GREEN)Testing API Gateway endpoints...$(NC)"
 	@bash tests/test-api.sh
 
+test-store: ## Test Store handler with soft-fail behavior
+	@echo "$(GREEN)Testing Store handler...$(NC)"
+	@bash tests/test-store-handler.sh
+
 test-graceful-shutdown: ## Test graceful shutdown
 	@echo "$(GREEN)Testing graceful shutdown...$(NC)"
 	@cd tests && bash test-graceful-shutdown.sh

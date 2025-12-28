@@ -10,7 +10,9 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 API_URL="http://localhost:8080"
-TEST_DOMAIN="example.com"
+# Use timestamp to make domain unique and avoid DB conflicts
+TIMESTAMP=$(date +%s)
+TEST_DOMAIN="example-${TIMESTAMP}.com"
 TEST_PATH="/"
 
 echo -e "${BLUE}=== API Gateway Integration Tests ===${NC}"

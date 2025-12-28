@@ -19,15 +19,23 @@ type StoreRequest []struct {
 }
 
 type StoreResponse struct {
-	ReceivedTexts    int    `json:"received_texts"`
-	PendingDocuments int    `json:"pending_documents"`
-	PendingIDs       []int  `json:"pending_ids,omitempty"`
-	Timestamp        string `json:"timestamp"`
+	ReceivedTexts    int             `json:"received_texts"`
+	PendingDocuments int             `json:"pending_documents"`
+	FailedDocuments  int             `json:"failed_documents"`
+	PendingIDs       []int           `json:"pending_ids,omitempty"`
+	FailedItems      []FailedItem    `json:"failed_items,omitempty"`
+	Timestamp        string          `json:"timestamp"`
 }
 
-// StoreHandler handles storing webpage data
+type FailedItem struct {
+	ID    int    `json:"id"`
+	Error string `json:"error"`
+}
+
+// StoreHandler handles storing webpage data with soft-fail behavior.
+// If at least one item is successfully queued, returns 202 Accepted with details.
+// If all items fail, returns 500 Internal Server Error.
 func StoreHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: Remember to soft-fail, i.e. if at least one item is stored, return success even if some fail, but log the errors and return them in the response
 	// Retrieve CacheEntry from context
 	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
@@ -56,30 +64,52 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Publish each document as a protobuf payload to the document queue
-	var failed int
 	var publishedIDs []int
+	var failedItems []FailedItem
+
 	for _, item := range req {
-		payload := &document_queue.DocumentQueuePayload{
-			SiteId:          int32(cacheEntry.ID),
-			Id:              int32(item.ID),
-			Text:            item.Text,
-			Extra:           item.Extra,
-			TimestampMillis: time.Now().UnixMilli(),
-		}
+		// Use proper payload creation with retry logic initialization
+		payload := document_queue.NewDocumentQueuePayload(
+			int32(cacheEntry.ID),
+			int32(item.ID),
+			item.Text,
+			item.Extra,
+			0, // use default max_retries from config
+		)
+
 		err := dq.Publish(payload)
 		if err != nil {
-			logger.Errorf("Failed to publish document to queue: %v", err)
-			failed++
+			logger.Errorf("Failed to publish document ID %d to queue: %v", item.ID, err)
+			failedItems = append(failedItems, FailedItem{
+				ID:    item.ID,
+				Error: err.Error(),
+			})
 		} else {
 			publishedIDs = append(publishedIDs, item.ID)
 		}
 	}
 
-	logger.Infof("Queued %d documents (failed: %d) for site ID %d", len(publishedIDs), failed, cacheEntry.ID)
-	_ = utils.RespondWithJSON(w, http.StatusAccepted, StoreResponse{
+	// Soft-fail: Return success if at least one item was queued
+	statusCode := http.StatusAccepted
+	if len(publishedIDs) == 0 {
+		// All items failed
+		statusCode = http.StatusInternalServerError
+		logger.Errorf("Failed to queue all %d documents for site ID %d", len(req), cacheEntry.ID)
+	} else if len(failedItems) > 0 {
+		// Partial success
+		logger.Warningf("Queued %d/%d documents for site ID %d (%d failed)",
+			len(publishedIDs), len(req), cacheEntry.ID, len(failedItems))
+	} else {
+		// Complete success
+		logger.Infof("Queued all %d documents for site ID %d", len(publishedIDs), cacheEntry.ID)
+	}
+
+	_ = utils.RespondWithJSON(w, statusCode, StoreResponse{
 		ReceivedTexts:    len(req),
 		PendingDocuments: len(publishedIDs),
+		FailedDocuments:  len(failedItems),
 		PendingIDs:       publishedIDs,
+		FailedItems:      failedItems,
 		Timestamp:        time.Now().Format(time.RFC3339),
 	})
 }
