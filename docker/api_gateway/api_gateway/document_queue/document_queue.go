@@ -231,3 +231,22 @@ func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePay
 func getCurrentTimestampMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
+
+// Close gracefully closes the NATS connection
+// It drains the connection first to ensure all buffered messages are sent
+func (dq *DocumentQueue) Close() error {
+	if dq.natsConn == nil {
+		return nil
+	}
+
+	// Drain the connection to flush any pending messages
+	if err := dq.natsConn.Drain(); err != nil {
+		logger.Warningf("Error draining NATS connection: %v", err)
+		// Continue with close even if drain fails
+	}
+
+	// Close the connection
+	dq.natsConn.Close()
+	logger.Infof("NATS connection closed successfully")
+	return nil
+}

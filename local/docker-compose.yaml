@@ -1,23 +1,17 @@
 services:
+  # Redis with Sentinel for local development
+  # Using different ports to avoid conflicts with local Redis installation
   redis-primary:
-    image: redis/redis-stack:latest
+    image: redis:7.4-alpine
     container_name: redis-primary
-    command: [ "redis-stack-server", "--appendonly", "yes", "--protected-mode", "no" ]
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--protected-mode", "no"]
+    # No external port exposure needed - only accessed via Sentinel internally
     volumes:
       - redis-primary-data:/data
-
-  redis-replica:
-    image: redis/redis-stack:latest
-    container_name: redis-replica
-    command: [ "redis-stack-server", "--appendonly", "yes", "--replicaof", "redis-primary", "6379", "--protected-mode", "no" ]
-    depends_on:
-      - redis-primary
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis-replica-data:/data
+    networks:
+      default:
+        aliases:
+          - redis-master
 
   redis-sentinel:
     build:
@@ -25,13 +19,16 @@ services:
       dockerfile: Dockerfile
     container_name: redis-sentinel
     ports:
-      - "26379:26379"
+      - "26380:26379"  # Use 26380 externally to avoid conflicts
     depends_on:
       - redis-primary
-      - redis-replica
+    networks:
+      default:
+        aliases:
+          - redis-sentinel
 
   qdrant:
-    image: qdrant/qdrant:v1.13.4
+    image: qdrant/qdrant:v1.16.3
     container_name: qdrant
     volumes:
       - qdrant-data:/qdrant/storage
@@ -50,20 +47,22 @@ services:
     environment:
       - LOCAL=1
 
-  snowflake-arctic:
-    build:
-      context: ../docker/models/snowflake-arctic
-      dockerfile: Dockerfile
-    container_name: snowflake-arctic
-    # volumes:
-    #   - ../docker/models/snowflake-arctic/weights:/app/snowflake-arctic
-    ports:
-      - "8000:8000"
-    environment:
-      - LOCAL=1
+  # Snowflake Arctic - Alternative model (disabled by default)
+  # To use: uncomment this service, comment out mpnetv2, and update api-gateway dependencies
+  # snowflake-arctic:
+  #   build:
+  #     context: ../docker/models/snowflake-arctic
+  #     dockerfile: Dockerfile
+  #   container_name: snowflake-arctic
+  #   # volumes:
+  #   #   - ../docker/models/snowflake-arctic/weights:/app/snowflake-arctic
+  #   ports:
+  #     - "8001:8000"  # Use different external port to avoid conflicts
+  #   environment:
+  #     - LOCAL=1
 
   mysql:
-    image: mysql:8.0
+    image: mysql:9.5.0
     container_name: mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -76,7 +75,7 @@ services:
       - "3306:3306"
 
   nats:
-    image: nats:latest
+    image: nats:2.12.3-scratch
     container_name: nats
     ports:
       - "4222:4222"  # Client connections
@@ -114,6 +113,5 @@ services:
 
 volumes:
   redis-primary-data:
-  redis-replica-data:
   mysql-data:
   qdrant-data:

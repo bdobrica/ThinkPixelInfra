@@ -40,8 +40,24 @@ func GetDBConnection() (*sql.DB, error) {
 		if err != nil {
 			return
 		}
+
+		// Configure connection pooling
+		maxOpenConns := config.GetEnvInt("API_GATEWAY_DB_MAX_OPEN_CONNS", 25)
+		maxIdleConns := config.GetEnvInt("API_GATEWAY_DB_MAX_IDLE_CONNS", 5)
+		connMaxLifetime := config.GetEnvDuration("API_GATEWAY_DB_CONN_MAX_LIFETIME", 5*time.Minute)
+
+		dbInstance.SetMaxOpenConns(maxOpenConns)
+		dbInstance.SetMaxIdleConns(maxIdleConns)
+		dbInstance.SetConnMaxLifetime(connMaxLifetime)
+
+		logger.Infof("Database connection pool configured: max_open=%d, max_idle=%d, max_lifetime=%s",
+			maxOpenConns, maxIdleConns, connMaxLifetime)
+
 		// Test the connection to ensure it's valid
 		err = dbInstance.Ping()
+		if err != nil {
+			logger.Errorf("Failed to ping database: %v", err)
+		}
 	})
 	if err != nil {
 		return nil, err

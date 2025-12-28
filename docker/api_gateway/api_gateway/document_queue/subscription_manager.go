@@ -4,6 +4,7 @@ import (
 	"api_gateway/config"
 	"api_gateway/logger"
 	"api_gateway/model"
+	"context"
 	"math/rand"
 	"sync"
 	"time"
@@ -173,7 +174,8 @@ func NewSubscriptionManager(dq *DocumentQueue) *SubscriptionManager {
 // - If latency is below target, ensures the subscriber is running.
 // - If latency is above target, probabilistically stops or starts the subscriber based on tunnelingProbability.
 // - Runs in a loop, checking latency at intervals.
-func (sm *SubscriptionManager) Monitor() {
+// - Context cancellation will stop the monitor gracefully.
+func (sm *SubscriptionManager) Monitor(ctx context.Context) {
 	targetLatency := config.GetEnvDuration("API_GATEWAY_MODEL_TARGET_LATENCY", 100*time.Millisecond)         // Default target latency in ms
 	tunnelingProbability := config.GetEnvPercentage("API_GATEWAY_MODEL_TUNNELING_PROBABILITY", 0.1)          // Default tunneling probability
 	latencyCheckInterval := config.GetEnvDuration("API_GATEWAY_MODEL_LATENCY_CHECK_INTERVAL", 5*time.Second) // Default latency check interval
@@ -187,33 +189,49 @@ func (sm *SubscriptionManager) Monitor() {
 
 	logger.Infof("Starting SubscriptionManager with target latency %.2f ms and tunneling probability %.2f", targetLatencyMs, tunnelingProbability)
 
-	for {
-		latencyMs := model.GetModelLatencyMs()
-		sm.docSubMutex.Lock()
-		running := sm.docSubscription != nil && sm.dlqSubscription != nil
-		sm.docSubMutex.Unlock()
+	ticker := time.NewTicker(latencyCheckInterval)
+	defer ticker.Stop()
 
-		if latencyMs < targetLatencyMs {
-			if !running {
-				if err := sm.startSubscription(); err != nil {
-					logger.Errorf("Failed to start subscription: %v", err)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof("Monitor context cancelled, stopping subscription manager")
+			if err := sm.stopSubscription(); err != nil {
+				logger.Errorf("Failed to stop subscription during shutdown: %v", err)
 			}
-		} else {
-			if running {
-				if rand.Float64() < 1-tunnelingProbability {
-					if err := sm.stopSubscription(); err != nil {
-						logger.Errorf("Failed to stop subscription: %v", err)
-					}
-				}
-			} else {
-				if rand.Float64() < tunnelingProbability {
+			return
+		case <-ticker.C:
+			latencyMs := model.GetModelLatencyMs()
+			sm.docSubMutex.Lock()
+			running := sm.docSubscription != nil && sm.dlqSubscription != nil
+			sm.docSubMutex.Unlock()
+
+			if latencyMs < targetLatencyMs {
+				if !running {
 					if err := sm.startSubscription(); err != nil {
 						logger.Errorf("Failed to start subscription: %v", err)
 					}
 				}
+			} else {
+				if running {
+					if rand.Float64() < 1-tunnelingProbability {
+						if err := sm.stopSubscription(); err != nil {
+							logger.Errorf("Failed to stop subscription: %v", err)
+						}
+					}
+				} else {
+					if rand.Float64() < tunnelingProbability {
+						if err := sm.startSubscription(); err != nil {
+							logger.Errorf("Failed to start subscription: %v", err)
+						}
+					}
+				}
 			}
 		}
-		time.Sleep(latencyCheckInterval)
 	}
+}
+
+// Stop gracefully stops the subscription manager
+func (sm *SubscriptionManager) Stop() error {
+	return sm.stopSubscription()
 }
