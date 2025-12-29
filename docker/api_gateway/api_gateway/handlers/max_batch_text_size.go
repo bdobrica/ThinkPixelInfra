@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"api_gateway/ctxkeys"
 	"api_gateway/db"
-	"api_gateway/middleware"
 	"api_gateway/utils"
 )
 
@@ -19,7 +19,7 @@ type MaxBatchTextSizeResponse struct {
 
 // MaxBatchTextSizeHandler handles the request to get the maximum batch text size
 func MaxBatchTextSizeHandler(w http.ResponseWriter, r *http.Request) {
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(db.APIKeyDetails)
+	cacheEntry, ok := r.Context().Value(ctxkeys.CacheEntryKey).(db.APIKeyDetails)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to retrieve cache entry from context")
 		return

@@ -29,6 +29,43 @@ var (
 	clientCacheLock  sync.Mutex
 )
 
+func init() {
+	// Start periodic cache cleanup goroutine
+	go periodicCacheCleanup()
+}
+
+// periodicCacheCleanup removes expired Redis client entries from the cache
+func periodicCacheCleanup() {
+	// Run cleanup every hour (or half of cache TTL, whichever is shorter)
+	cleanupInterval := clientCacheTTL / 2
+	if cleanupInterval > time.Hour {
+		cleanupInterval = time.Hour
+	}
+
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		expiredCount := 0
+
+		// Iterate through cache and remove expired entries
+		clientCache.Range(func(key, value interface{}) bool {
+			entry := value.(redisClientCacheEntry)
+			if now.After(entry.expiresAt) {
+				clientCache.Delete(key)
+				expiredCount++
+				logger.Debugf("Removed expired Redis client from cache: %v", key)
+			}
+			return true
+		})
+
+		if expiredCount > 0 {
+			logger.Infof("Redis client cache cleanup: removed %d expired entries", expiredCount)
+		}
+	}
+}
+
 // extract redis host, port and master name from redis server string
 func extractIndexingNodeInfo(indexingNode string) (host string, port string, masterName string, err error) {
 	// Split the string into host:port and masterName

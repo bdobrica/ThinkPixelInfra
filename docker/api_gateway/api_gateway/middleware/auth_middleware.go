@@ -6,13 +6,9 @@ import (
 	"strings"
 
 	"api_gateway/auth"
+	"api_gateway/ctxkeys"
 	"api_gateway/utils"
 )
-
-// ContextKey defines the type for context keys to avoid conflicts
-type ContextKey string
-
-const CacheEntryKey ContextKey = "cacheEntry"
 
 // JWTMiddleware validates JWT for protected routes and passes CacheEntry to handlers
 func JWTMiddleware(next http.Handler) http.Handler {
@@ -46,7 +42,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Embed CacheEntry into the request context
-		ctx := context.WithValue(r.Context(), CacheEntryKey, cacheEntry)
+		ctx := context.WithValue(r.Context(), ctxkeys.CacheEntryKey, cacheEntry)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

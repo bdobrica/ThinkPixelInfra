@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"api_gateway/auth"
+	"api_gateway/ctxkeys"
 	"api_gateway/logger"
-	"api_gateway/middleware"
 	"api_gateway/qdrantconn"
 	"api_gateway/redisconn"
 	"api_gateway/utils"
@@ -54,7 +54,7 @@ func getRemoveEmbeddingByOffsetCallback(cacheEntry auth.CacheEntry) (RemoveEmbed
 
 func RemoveEmbeddingByOffsetHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve CacheEntry from context
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	cacheEntry, ok := r.Context().Value(ctxkeys.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
 		return
@@ -91,7 +91,7 @@ func RemoveEmbeddingByOffsetHandler(w http.ResponseWriter, r *http.Request) {
 
 func RemoveMultipleEmbeddingsByOffsetHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve CacheEntry from context
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	cacheEntry, ok := r.Context().Value(ctxkeys.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
 		return

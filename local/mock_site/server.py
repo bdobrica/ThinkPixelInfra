@@ -1,12 +1,23 @@
 import json
+import os
 
-import requests
+import mysql.connector
 from flask import Flask, Response, abort, request
 
 app = Flask(__name__)
 
-# module‐level “current” token
-validation_token = None
+# Database connection configuration
+DB_CONFIG = {
+    "host": os.environ.get("DB_HOST", "mysql"),
+    "user": os.environ.get("DB_USER", "root"),
+    "password": os.environ.get("DB_PASSWORD", "root"),
+    "database": os.environ.get("DB_NAME", "thinkpixel"),
+}
+
+
+def get_db_connection():
+    """Create and return a database connection"""
+    return mysql.connector.connect(**DB_CONFIG)
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -17,56 +28,48 @@ def root():
     }:
         abort(404)
 
-    # GET (and HEAD via Flask) → serve your stub
+    # GET (and HEAD via Flask) - serve your stub
     if request.method == "GET":
+        # Query database for the latest validation token for this domain
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT validation_token FROM wp_thinkpixel_sites"
+                " WHERE domain='mock-site' AND path='/' AND validation_status='pending'"
+                " ORDER BY created_at DESC LIMIT 1"
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+
+            validation_token = result["validation_token"] if result else None
+        except Exception as e:
+            app.logger.error(f"Failed to query validation token: {e}")
+            validation_token = None
+
         payload = {
-            "domain": "example.com",
+            "domain": "mock-site",
             "path": "/",
             "validation_token": validation_token,
             "nonce": "1234567890abcdef",
         }
         return Response(json.dumps(payload), mimetype="application/json")
 
-    # POST → validate and echo
+    # POST - validate and echo
     data = request.get_json(silent=True)
     if data is None:
         abort(400, description="Invalid JSON")
 
-    # log the API key for debug
-    app.logger.info("API Key: %s", data.get("api_key"))
+    # Store the API key for testing purposes
+    api_key = data.get("api_key")
+    if api_key:
+        with open("/tmp/api_key.txt", "w") as f:
+            f.write(api_key)
+        app.logger.info("API Key stored: %s", api_key)
 
     return Response(
-        json.dumps({"success": True, "message": "Validation token accepted"}),
-        mimetype="application/json",
-    )
-
-
-@app.route("/register", methods=["GET"])
-def register():
-    global validation_token  # ← make sure we update the module‐level var
-
-    resp = requests.post(
-        "http://api-gateway:8080/register",
-        json={
-            "domain": "example.com",
-            "path": "/",
-            "estimated_pages": 415,
-            "average_page_size": 1478,
-            "st_dev_page_size": 4891,
-        },
-    )
-    app.logger.info("Response from API Gateway: %s", resp.text)
-
-    if resp.status_code != 200:
-        abort(500, description="Failed to register with API Gateway")
-
-    parsed = resp.json()
-    validation_token = parsed.get("validation_token")
-    if not validation_token:
-        abort(500, description="Invalid response from API Gateway")
-
-    return Response(
-        json.dumps({"validation_token": validation_token}),
+        json.dumps({"success": "true", "message": "Validation token accepted"}),
         mimetype="application/json",
     )
 

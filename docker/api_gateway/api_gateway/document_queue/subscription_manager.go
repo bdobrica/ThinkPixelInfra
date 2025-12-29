@@ -2,8 +2,12 @@ package document_queue
 
 import (
 	"api_gateway/config"
+	"api_gateway/dlq"
 	"api_gateway/logger"
+	"api_gateway/metrics"
 	"api_gateway/model"
+	"context"
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"time"
@@ -24,19 +28,60 @@ type SubscriptionManager struct {
 }
 
 // deadLetterHandler processes messages that have exceeded their retry limit
-// This is where you can implement logging, alerting, or manual inspection logic
-func deadLetterHandler(payload *DocumentQueuePayload) error {
+// This stores the failed message in Redis with TTL for ephemeral storage
+func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 	logger.Errorf("Dead letter message received for site %d, document ID %d after %d retries. Last error: %s",
 		payload.SiteId, payload.Id, payload.RetryCount, payload.ErrorMessage)
 
-	// You can implement additional logic here such as:
-	// - Send alerts to monitoring systems
-	// - Store in a database for manual inspection
-	// - Send notifications to administrators
-	// - Implement exponential backoff for very specific retries
+	// Serialize payload to JSON for debugging
+	payloadJSON, err := marshalPayloadToJSON(payload)
+	if err != nil {
+		logger.Warningf("Failed to marshal DLQ payload to JSON: %v", err)
+		payloadJSON = "{}" // Use empty JSON if marshaling fails
+	}
 
-	// For now, just log the failure
+	// Store in Redis DLQ with TTL
+	err = dlq.StoreDLQMessage(
+		payload.SiteId,
+		payload.Id,
+		subject,
+		payload.ErrorMessage,
+		payloadJSON,
+		payload.RetryCount,
+	)
+	if err != nil {
+		logger.Errorf("Failed to store dead letter in Redis: %v", err)
+		return err
+	}
+
+	// Increment DLQ metrics
+	metrics.NATSDLQMessages.Inc()
+
 	return nil
+}
+
+// marshalPayloadToJSON converts a DocumentQueuePayload to JSON string
+func marshalPayloadToJSON(payload *DocumentQueuePayload) (string, error) {
+	// Create a simplified structure for JSON serialization
+	data := map[string]interface{}{
+		"site_id":              payload.SiteId,
+		"id":                   payload.Id,
+		"text":                 payload.Text,
+		"extra":                payload.Extra,
+		"retry_count":          payload.RetryCount,
+		"max_retries":          payload.MaxRetries,
+		"status":               payload.Status.String(),
+		"error_message":        payload.ErrorMessage,
+		"timestamp_millis":     payload.TimestampMillis,
+		"last_retry_timestamp": payload.LastRetryTimestamp,
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonBytes), nil
 }
 
 // subscriberHandler processes a queued document payload:
@@ -66,8 +111,11 @@ func subscriberHandler(payload *DocumentQueuePayload) error {
 	}
 	logger.Debugf("CacheEntry for site ID %d: %+v", payload.SiteId, cacheEntry)
 
-	// Call model API to get embeddings
+	// Call model API to get embeddings (with metrics)
+	start := time.Now()
 	response, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
+	metrics.ModelLatency.WithLabelValues(cacheEntry.Model, "embeddings").Observe(time.Since(start).Seconds())
+
 	if err != nil {
 		logger.Errorf("Error retrieving embeddings: %v", err)
 		return err
@@ -173,7 +221,8 @@ func NewSubscriptionManager(dq *DocumentQueue) *SubscriptionManager {
 // - If latency is below target, ensures the subscriber is running.
 // - If latency is above target, probabilistically stops or starts the subscriber based on tunnelingProbability.
 // - Runs in a loop, checking latency at intervals.
-func (sm *SubscriptionManager) Monitor() {
+// - Context cancellation will stop the monitor gracefully.
+func (sm *SubscriptionManager) Monitor(ctx context.Context) {
 	targetLatency := config.GetEnvDuration("API_GATEWAY_MODEL_TARGET_LATENCY", 100*time.Millisecond)         // Default target latency in ms
 	tunnelingProbability := config.GetEnvPercentage("API_GATEWAY_MODEL_TUNNELING_PROBABILITY", 0.1)          // Default tunneling probability
 	latencyCheckInterval := config.GetEnvDuration("API_GATEWAY_MODEL_LATENCY_CHECK_INTERVAL", 5*time.Second) // Default latency check interval
@@ -187,33 +236,49 @@ func (sm *SubscriptionManager) Monitor() {
 
 	logger.Infof("Starting SubscriptionManager with target latency %.2f ms and tunneling probability %.2f", targetLatencyMs, tunnelingProbability)
 
-	for {
-		latencyMs := model.GetModelLatencyMs()
-		sm.docSubMutex.Lock()
-		running := sm.docSubscription != nil && sm.dlqSubscription != nil
-		sm.docSubMutex.Unlock()
+	ticker := time.NewTicker(latencyCheckInterval)
+	defer ticker.Stop()
 
-		if latencyMs < targetLatencyMs {
-			if !running {
-				if err := sm.startSubscription(); err != nil {
-					logger.Errorf("Failed to start subscription: %v", err)
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof("Monitor context cancelled, stopping subscription manager")
+			if err := sm.stopSubscription(); err != nil {
+				logger.Errorf("Failed to stop subscription during shutdown: %v", err)
 			}
-		} else {
-			if running {
-				if rand.Float64() < 1-tunnelingProbability {
-					if err := sm.stopSubscription(); err != nil {
-						logger.Errorf("Failed to stop subscription: %v", err)
-					}
-				}
-			} else {
-				if rand.Float64() < tunnelingProbability {
+			return
+		case <-ticker.C:
+			latencyMs := model.GetModelLatencyMs()
+			sm.docSubMutex.Lock()
+			running := sm.docSubscription != nil && sm.dlqSubscription != nil
+			sm.docSubMutex.Unlock()
+
+			if latencyMs < targetLatencyMs {
+				if !running {
 					if err := sm.startSubscription(); err != nil {
 						logger.Errorf("Failed to start subscription: %v", err)
 					}
 				}
+			} else {
+				if running {
+					if rand.Float64() < 1-tunnelingProbability {
+						if err := sm.stopSubscription(); err != nil {
+							logger.Errorf("Failed to stop subscription: %v", err)
+						}
+					}
+				} else {
+					if rand.Float64() < tunnelingProbability {
+						if err := sm.startSubscription(); err != nil {
+							logger.Errorf("Failed to start subscription: %v", err)
+						}
+					}
+				}
 			}
 		}
-		time.Sleep(latencyCheckInterval)
 	}
+}
+
+// Stop gracefully stops the subscription manager
+func (sm *SubscriptionManager) Stop() error {
+	return sm.stopSubscription()
 }

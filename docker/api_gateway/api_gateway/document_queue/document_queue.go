@@ -3,6 +3,7 @@ package document_queue
 import (
 	"api_gateway/config"
 	"api_gateway/logger"
+	"api_gateway/metrics"
 	"fmt"
 	"os"
 	"time"
@@ -76,13 +77,21 @@ func NewDocumentQueue() *DocumentQueue {
 // Returns an error if the connection is not initialized or if marshaling fails.
 func (dq *DocumentQueue) publish(subject string, payload *DocumentQueuePayload) error {
 	if dq.natsConn == nil {
+		metrics.NATSMessagesPublished.WithLabelValues("failure").Inc()
 		return fmt.Errorf("NATS connection not initialized")
 	}
 	data, err := proto.Marshal(payload)
 	if err != nil {
+		metrics.NATSMessagesPublished.WithLabelValues("failure").Inc()
 		return fmt.Errorf("failed to marshal protobuf payload: %w", err)
 	}
-	return dq.natsConn.Publish(subject, data)
+	err = dq.natsConn.Publish(subject, data)
+	if err != nil {
+		metrics.NATSMessagesPublished.WithLabelValues("failure").Inc()
+	} else {
+		metrics.NATSMessagesPublished.WithLabelValues("success").Inc()
+	}
+	return err
 }
 
 // Publish sends a protobuf-encoded DocumentQueuePayload to the default NATS subject.
@@ -101,10 +110,43 @@ func (dq *DocumentQueue) subscribe(subject string, handler func(payload *Documen
 	sub, err := dq.natsConn.Subscribe(subject, func(msg *nats.Msg) {
 		payload := &DocumentQueuePayload{}
 		if err := proto.Unmarshal(msg.Data, payload); err != nil {
-			// Handle unmarshal error
+			// Record unmarshal error metric
+			metrics.NATSUnmarshalErrors.Inc()
+
+			// Log unmarshal error with message details
+			logger.Errorf("Failed to unmarshal NATS message on subject %s: %v (message size: %d bytes, first 100 bytes: %x)",
+				subject, err, len(msg.Data), truncateBytes(msg.Data, 100))
+
+			// Create error payload for poison message
+			dlqSubject := subject + ".dlq"
+			poisonPayload := &DocumentQueuePayload{
+				Status:       MessageStatus_FAILED,
+				ErrorMessage: fmt.Sprintf("Unmarshal failed on %s: %v", subject, err),
+				RetryCount:   0,
+				MaxRetries:   0,
+			}
+
+			// Try to publish to DLQ (best effort, don't block)
+			go func() {
+				// Record DLQ message metric
+				metrics.NATSDLQMessages.Inc()
+
+				if pubErr := dq.publish(dlqSubject, poisonPayload); pubErr != nil {
+					logger.Errorf("Failed to publish poison message to DLQ %s: %v", dlqSubject, pubErr)
+				} else {
+					logger.Infof("Poison message sent to DLQ: %s", dlqSubject)
+				}
+			}()
+
+			// Note: For NATS Core (non-JetStream), messages are auto-acked
+			// No explicit Ack() needed - just return to drop the message
+			metrics.NATSMessagesProcessed.WithLabelValues("failure").Inc()
 			return
 		}
+
+		// Process the message
 		handler(payload)
+		metrics.NATSMessagesProcessed.WithLabelValues("success").Inc()
 	})
 	if err != nil {
 		return nil, err
@@ -171,7 +213,7 @@ func NewDocumentQueuePayload(siteID, id int32, text string, extra map[string]str
 
 // SubscribeWithDLQ subscribes to both the main subject and its dead letter queue
 // Returns subscriptions for both main and DLQ subjects
-func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePayload) error, dlqHandler func(payload *DocumentQueuePayload) error) (*nats.Subscription, *nats.Subscription, error) {
+func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePayload) error, dlqHandler func(payload *DocumentQueuePayload, subject string) error) (*nats.Subscription, *nats.Subscription, error) {
 	if dq.natsConn == nil {
 		return nil, nil, fmt.Errorf("NATS connection not initialized")
 	}
@@ -209,7 +251,7 @@ func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePay
 		}
 
 		if dlqHandler != nil {
-			if err := dlqHandler(payload); err != nil {
+			if err := dlqHandler(payload, dlqSubject); err != nil {
 				logger.Errorf("DLQ handler failed for message: %v", err)
 			}
 		} else {
@@ -230,4 +272,31 @@ func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePay
 // getCurrentTimestampMillis returns the current timestamp in milliseconds
 func getCurrentTimestampMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+// truncateBytes returns the first n bytes of data, or all of it if shorter
+func truncateBytes(data []byte, n int) []byte {
+	if len(data) <= n {
+		return data
+	}
+	return data[:n]
+}
+
+// Close gracefully closes the NATS connection
+// It drains the connection first to ensure all buffered messages are sent
+func (dq *DocumentQueue) Close() error {
+	if dq.natsConn == nil {
+		return nil
+	}
+
+	// Drain the connection to flush any pending messages
+	if err := dq.natsConn.Drain(); err != nil {
+		logger.Warningf("Error draining NATS connection: %v", err)
+		// Continue with close even if drain fails
+	}
+
+	// Close the connection
+	dq.natsConn.Close()
+	logger.Infof("NATS connection closed successfully")
+	return nil
 }

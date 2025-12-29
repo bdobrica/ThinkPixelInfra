@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"api_gateway/auth"
+	"api_gateway/ctxkeys"
 	"api_gateway/logger"
-	"api_gateway/middleware"
 	"api_gateway/model"
 	"api_gateway/qdrantconn"
 	"api_gateway/redisconn"
@@ -43,7 +43,7 @@ func getSearchCallback(cacheEntry auth.CacheEntry) (SearchCallback, error) {
 // SearchHandler handles embedding creation and ANN search
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve CacheEntry from context
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	cacheEntry, ok := r.Context().Value(ctxkeys.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
 		return
