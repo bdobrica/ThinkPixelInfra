@@ -2,10 +2,12 @@ package document_queue
 
 import (
 	"api_gateway/config"
+	"api_gateway/db"
 	"api_gateway/logger"
 	"api_gateway/metrics"
 	"api_gateway/model"
 	"context"
+	"encoding/json"
 	"math/rand"
 	"sync"
 	"time"
@@ -26,19 +28,60 @@ type SubscriptionManager struct {
 }
 
 // deadLetterHandler processes messages that have exceeded their retry limit
-// This is where you can implement logging, alerting, or manual inspection logic
-func deadLetterHandler(payload *DocumentQueuePayload) error {
+// This stores the failed message in the database for manual inspection
+func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 	logger.Errorf("Dead letter message received for site %d, document ID %d after %d retries. Last error: %s",
 		payload.SiteId, payload.Id, payload.RetryCount, payload.ErrorMessage)
 
-	// You can implement additional logic here such as:
-	// - Send alerts to monitoring systems
-	// - Store in a database for manual inspection
-	// - Send notifications to administrators
-	// - Implement exponential backoff for very specific retries
+	// Serialize payload to JSON for debugging
+	payloadJSON, err := marshalPayloadToJSON(payload)
+	if err != nil {
+		logger.Warningf("Failed to marshal DLQ payload to JSON: %v", err)
+		payloadJSON = "{}" // Use empty JSON if marshaling fails
+	}
 
-	// For now, just log the failure
+	// Store in database for manual inspection
+	err = db.InsertDeadLetter(
+		payload.SiteId,
+		payload.Id,
+		subject,
+		payload.ErrorMessage,
+		payloadJSON,
+		payload.RetryCount,
+	)
+	if err != nil {
+		logger.Errorf("Failed to store dead letter in database: %v", err)
+		return err
+	}
+
+	// Increment DLQ metrics
+	metrics.NATSDLQMessages.Inc()
+
 	return nil
+}
+
+// marshalPayloadToJSON converts a DocumentQueuePayload to JSON string
+func marshalPayloadToJSON(payload *DocumentQueuePayload) (string, error) {
+	// Create a simplified structure for JSON serialization
+	data := map[string]interface{}{
+		"site_id":              payload.SiteId,
+		"id":                   payload.Id,
+		"text":                 payload.Text,
+		"extra":                payload.Extra,
+		"retry_count":          payload.RetryCount,
+		"max_retries":          payload.MaxRetries,
+		"status":               payload.Status.String(),
+		"error_message":        payload.ErrorMessage,
+		"timestamp_millis":     payload.TimestampMillis,
+		"last_retry_timestamp": payload.LastRetryTimestamp,
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonBytes), nil
 }
 
 // subscriberHandler processes a queued document payload:

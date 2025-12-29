@@ -67,7 +67,7 @@ func main() {
 	// Configure HTTP server with timeouts
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      middleware.MetricsMiddleware(r),
+		Handler:      middleware.RequestIDMiddleware(middleware.MetricsMiddleware(r)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,

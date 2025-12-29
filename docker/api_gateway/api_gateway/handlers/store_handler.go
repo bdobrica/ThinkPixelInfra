@@ -19,12 +19,12 @@ type StoreRequest []struct {
 }
 
 type StoreResponse struct {
-	ReceivedTexts    int             `json:"received_texts"`
-	PendingDocuments int             `json:"pending_documents"`
-	FailedDocuments  int             `json:"failed_documents"`
-	PendingIDs       []int           `json:"pending_ids,omitempty"`
-	FailedItems      []FailedItem    `json:"failed_items,omitempty"`
-	Timestamp        string          `json:"timestamp"`
+	ReceivedTexts    int          `json:"received_texts"`
+	PendingDocuments int          `json:"pending_documents"`
+	FailedDocuments  int          `json:"failed_documents"`
+	PendingIDs       []int        `json:"pending_ids,omitempty"`
+	FailedItems      []FailedItem `json:"failed_items,omitempty"`
+	Timestamp        string       `json:"timestamp"`
 }
 
 type FailedItem struct {
@@ -36,29 +36,34 @@ type FailedItem struct {
 // If at least one item is successfully queued, returns 202 Accepted with details.
 // If all items fail, returns 500 Internal Server Error.
 func StoreHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	// Retrieve CacheEntry from context
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	cacheEntry, ok := ctx.Value(middleware.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
 		return
 	}
-	logger.Debugf("CacheEntry %+v", cacheEntry)
+	logger.DebugfCtx(ctx, "CacheEntry %+v", cacheEntry)
 
 	// Parse input
 	var req StoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.ErrorfCtx(ctx, "Failed to decode request body: %v", err)
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
 	if len(req) == 0 {
+		logger.WarningfCtx(ctx, "Empty request received")
 		utils.RespondWithError(w, http.StatusBadRequest, "Request must contain at least one item")
 		return
 	}
 
 	// Create DocumentQueue object
-	dq := r.Context().Value(middleware.DocumentQueueKey).(*document_queue.DocumentQueue)
+	dq := ctx.Value(middleware.DocumentQueueKey).(*document_queue.DocumentQueue)
 	if dq == nil {
+		logger.ErrorfCtx(ctx, "DocumentQueue not found in context")
 		utils.RespondWithError(w, http.StatusServiceUnavailable, "DocumentQueue not found in context")
 		return
 	}
@@ -79,7 +84,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 
 		err := dq.Publish(payload)
 		if err != nil {
-			logger.Errorf("Failed to publish document ID %d to queue: %v", item.ID, err)
+			logger.ErrorfCtx(ctx, "Failed to publish document ID %d to queue: %v", item.ID, err)
 			failedItems = append(failedItems, FailedItem{
 				ID:    item.ID,
 				Error: err.Error(),
@@ -94,14 +99,14 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	if len(publishedIDs) == 0 {
 		// All items failed
 		statusCode = http.StatusInternalServerError
-		logger.Errorf("Failed to queue all %d documents for site ID %d", len(req), cacheEntry.ID)
+		logger.ErrorfCtx(ctx, "Failed to queue all %d documents for site ID %d", len(req), cacheEntry.ID)
 	} else if len(failedItems) > 0 {
 		// Partial success
-		logger.Warningf("Queued %d/%d documents for site ID %d (%d failed)",
+		logger.WarningfCtx(ctx, "Queued %d/%d documents for site ID %d (%d failed)",
 			len(publishedIDs), len(req), cacheEntry.ID, len(failedItems))
 	} else {
 		// Complete success
-		logger.Infof("Queued all %d documents for site ID %d", len(publishedIDs), cacheEntry.ID)
+		logger.InfofCtx(ctx, "Queued all %d documents for site ID %d", len(publishedIDs), cacheEntry.ID)
 	}
 
 	_ = utils.RespondWithJSON(w, statusCode, StoreResponse{
