@@ -30,6 +30,43 @@ var (
 	clientCacheLock sync.Mutex
 )
 
+func init() {
+	// Start periodic cache cleanup goroutine
+	go periodicCacheCleanup()
+}
+
+// periodicCacheCleanup removes expired Qdrant client entries from the cache
+func periodicCacheCleanup() {
+	// Run cleanup every hour (or half of cache TTL, whichever is shorter)
+	cleanupInterval := clientCacheTTL / 2
+	if cleanupInterval > time.Hour {
+		cleanupInterval = time.Hour
+	}
+
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		expiredCount := 0
+
+		// Iterate through cache and remove expired entries
+		clientCache.Range(func(key, value interface{}) bool {
+			entry := value.(qdrantClientCacheEntry)
+			if now.After(entry.expiresAt) {
+				clientCache.Delete(key)
+				expiredCount++
+				logger.Debugf("Removed expired Qdrant client from cache: %v", key)
+			}
+			return true
+		})
+
+		if expiredCount > 0 {
+			logger.Infof("Qdrant client cache cleanup: removed %d expired entries", expiredCount)
+		}
+	}
+}
+
 // extract qdrant host and port from qdrant server string
 func extractIndexingNodeInfo(indexingNode string) (host string, port int, err error) {
 	// Split host:port into host and port
