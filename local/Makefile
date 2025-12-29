@@ -145,6 +145,10 @@ test-store: ## Test Store handler with soft-fail behavior
 	@echo "$(GREEN)Testing Store handler...$(NC)"
 	@bash tests/test-store-handler.sh
 
+test-db-nats: ## Test database connection pooling and NATS error handling
+	@echo "$(GREEN)Testing database & NATS error handling...$(NC)"
+	@bash tests/test-database-nats.sh
+
 test-graceful-shutdown: ## Test graceful shutdown
 	@echo "$(GREEN)Testing graceful shutdown...$(NC)"
 	@cd tests && bash test-graceful-shutdown.sh

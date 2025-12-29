@@ -37,6 +37,9 @@ func main() {
 	// Ping Route
 	r.HandleFunc("/ping", ping.PingHandler).Methods("GET")
 
+	// Health Check Route
+	r.HandleFunc("/ready", handlers.ReadyHandler).Methods("GET")
+
 	// Auth Routes
 	r.HandleFunc("/auth/token", auth.AuthHandler).Methods("POST")
 

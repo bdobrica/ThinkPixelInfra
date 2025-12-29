@@ -101,7 +101,30 @@ func (dq *DocumentQueue) subscribe(subject string, handler func(payload *Documen
 	sub, err := dq.natsConn.Subscribe(subject, func(msg *nats.Msg) {
 		payload := &DocumentQueuePayload{}
 		if err := proto.Unmarshal(msg.Data, payload); err != nil {
-			// Handle unmarshal error
+			// Log unmarshal error with message details
+			logger.Errorf("Failed to unmarshal NATS message on subject %s: %v (message size: %d bytes, first 100 bytes: %x)",
+				subject, err, len(msg.Data), truncateBytes(msg.Data, 100))
+
+			// Create error payload for poison message
+			dlqSubject := subject + ".dlq"
+			poisonPayload := &DocumentQueuePayload{
+				Status:       MessageStatus_FAILED,
+				ErrorMessage: fmt.Sprintf("Unmarshal failed on %s: %v", subject, err),
+				RetryCount:   0,
+				MaxRetries:   0,
+			}
+
+			// Try to publish to DLQ (best effort, don't block)
+			go func() {
+				if pubErr := dq.publish(dlqSubject, poisonPayload); pubErr != nil {
+					logger.Errorf("Failed to publish poison message to DLQ %s: %v", dlqSubject, pubErr)
+				} else {
+					logger.Infof("Poison message sent to DLQ: %s", dlqSubject)
+				}
+			}()
+
+			// Note: For NATS Core (non-JetStream), messages are auto-acked
+			// No explicit Ack() needed - just return to drop the message
 			return
 		}
 		handler(payload)
@@ -230,6 +253,14 @@ func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePay
 // getCurrentTimestampMillis returns the current timestamp in milliseconds
 func getCurrentTimestampMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+// truncateBytes returns the first n bytes of data, or all of it if shorter
+func truncateBytes(data []byte, n int) []byte {
+	if len(data) <= n {
+		return data
+	}
+	return data[:n]
 }
 
 // Close gracefully closes the NATS connection
