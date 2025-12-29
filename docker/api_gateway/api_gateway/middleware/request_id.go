@@ -1,14 +1,12 @@
 package middleware
 
 import (
+	"api_gateway/ctxkeys"
 	"context"
 	"net/http"
 
 	"github.com/google/uuid"
 )
-
-// RequestIDKey is the context key for request IDs
-const RequestIDKey ContextKey = "request_id"
 
 // RequestIDHeader is the HTTP header name for request IDs
 const RequestIDHeader = "X-Request-ID"
@@ -27,7 +25,7 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Add request ID to context
-		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
+		ctx := context.WithValue(r.Context(), ctxkeys.RequestIDKey, requestID)
 
 		// Add request ID to response header
 		w.Header().Set(RequestIDHeader, requestID)
@@ -44,7 +42,7 @@ func GetRequestID(ctx context.Context) string {
 		return ""
 	}
 
-	requestID, ok := ctx.Value(RequestIDKey).(string)
+	requestID, ok := ctx.Value(ctxkeys.RequestIDKey).(string)
 	if !ok {
 		return ""
 	}

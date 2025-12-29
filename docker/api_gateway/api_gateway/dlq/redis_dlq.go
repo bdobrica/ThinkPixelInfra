@@ -203,7 +203,7 @@ func GetDLQMessages(siteID int32, limit int) ([]DLQMessage, error) {
 	var err error
 
 	if limit > 0 {
-		results, err = dlqRedisClient.LRange(ctx, dlqKey, -limit, -1).Result()
+		results, err = dlqRedisClient.LRange(ctx, dlqKey, int64(-limit), -1).Result()
 	} else {
 		results, err = dlqRedisClient.LRange(ctx, dlqKey, 0, -1).Result()
 	}
@@ -374,13 +374,10 @@ func startExportWorker() {
 	ticker := time.NewTicker(dlqExportInterval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			logger.Infof("Running DLQ export job...")
-			if err := exportToFile(); err != nil {
-				logger.Errorf("DLQ export failed: %v", err)
-			}
+	for range ticker.C {
+		logger.Infof("Running DLQ export job...")
+		if err := exportToFile(); err != nil {
+			logger.Errorf("DLQ export failed: %v", err)
 		}
 	}
 }

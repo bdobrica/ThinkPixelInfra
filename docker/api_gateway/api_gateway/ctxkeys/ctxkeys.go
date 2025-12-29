@@ -9,4 +9,7 @@ const (
 
 	// DocumentQueueKey is used to store the document queue in the request context
 	DocumentQueueKey ContextKey = "documentQueue"
+
+	// RequestIDKey is the context key for request IDs
+	RequestIDKey ContextKey = "requestID"
 )

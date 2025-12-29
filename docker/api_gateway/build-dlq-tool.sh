@@ -5,8 +5,11 @@ set -e
 
 echo "Building DLQ reinjection tool..."
 
+# Change to api_gateway directory where go.mod is located
+cd api_gateway
+
 # Build for current platform
-go build -o dlq-reinject cmd/dlq-reinject/main.go
+go build -o ../dlq-reinject cmd/dlq-reinject/main.go
 
 echo "✅ Built: ./dlq-reinject"
 
@@ -15,19 +18,19 @@ if [ "$1" == "all" ]; then
     echo "Building for multiple platforms..."
 
     # Linux AMD64
-    GOOS=linux GOARCH=amd64 go build -o dlq-reinject-linux-amd64 cmd/dlq-reinject/main.go
+    GOOS=linux GOARCH=amd64 go build -o ../dlq-reinject-linux-amd64 cmd/dlq-reinject/main.go
     echo "✅ Built: ./dlq-reinject-linux-amd64"
 
     # Linux ARM64
-    GOOS=linux GOARCH=arm64 go build -o dlq-reinject-linux-arm64 cmd/dlq-reinject/main.go
+    GOOS=linux GOARCH=arm64 go build -o ../dlq-reinject-linux-arm64 cmd/dlq-reinject/main.go
     echo "✅ Built: ./dlq-reinject-linux-arm64"
 
     # macOS AMD64
-    GOOS=darwin GOARCH=amd64 go build -o dlq-reinject-darwin-amd64 cmd/dlq-reinject/main.go
+    GOOS=darwin GOARCH=amd64 go build -o ../dlq-reinject-darwin-amd64 cmd/dlq-reinject/main.go
     echo "✅ Built: ./dlq-reinject-darwin-amd64"
 
     # macOS ARM64 (M1/M2)
-    GOOS=darwin GOARCH=arm64 go build -o dlq-reinject-darwin-arm64 cmd/dlq-reinject/main.go
+    GOOS=darwin GOARCH=arm64 go build -o ../dlq-reinject-darwin-arm64 cmd/dlq-reinject/main.go
     echo "✅ Built: ./dlq-reinject-darwin-arm64"
 fi
 
