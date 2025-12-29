@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
+	"api_gateway/ctxkeys"
 	"api_gateway/db"
-	"api_gateway/middleware"
 	"api_gateway/register"
 	"api_gateway/utils"
 )
@@ -16,7 +16,7 @@ type RefreshAPIKeyResponse struct {
 
 // RefreshAPIKeyHandler handles the API key refresh request
 func RefreshAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
-	cacheEntry, ok := r.Context().Value(middleware.CacheEntryKey).(db.APIKeyDetails)
+	cacheEntry, ok := r.Context().Value(ctxkeys.CacheEntryKey).(db.APIKeyDetails)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to retrieve cache entry from context")
 		return

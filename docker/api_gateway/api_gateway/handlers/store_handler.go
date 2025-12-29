@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"api_gateway/auth"
+	"api_gateway/ctxkeys"
 	"api_gateway/document_queue"
 	"api_gateway/logger"
-	"api_gateway/middleware"
 	"api_gateway/utils"
 )
 
@@ -39,7 +39,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Retrieve CacheEntry from context
-	cacheEntry, ok := ctx.Value(middleware.CacheEntryKey).(auth.CacheEntry)
+	cacheEntry, ok := ctx.Value(ctxkeys.CacheEntryKey).(auth.CacheEntry)
 	if !ok {
 		utils.RespondWithError(w, http.StatusInternalServerError, "CacheEntry not found in context")
 		return
@@ -61,7 +61,7 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create DocumentQueue object
-	dq := ctx.Value(middleware.DocumentQueueKey).(*document_queue.DocumentQueue)
+	dq := ctx.Value(ctxkeys.DocumentQueueKey).(*document_queue.DocumentQueue)
 	if dq == nil {
 		logger.ErrorfCtx(ctx, "DocumentQueue not found in context")
 		utils.RespondWithError(w, http.StatusServiceUnavailable, "DocumentQueue not found in context")
