@@ -161,6 +161,34 @@ test-integration: ## Run integration tests
 	@echo "$(GREEN)Running integration tests...$(NC)"
 	@bash tests/test-integration.sh
 
+test-unit: ## Run all unit tests
+	@echo "$(GREEN)Running unit tests...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && go test -v ./document_queue/ ./auth/ ./utils/ ./config/ ./logger/
+
+test-unit-coverage: ## Run unit tests with coverage report
+	@echo "$(GREEN)Running unit tests with coverage...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && go test -cover ./document_queue/ ./auth/ ./utils/ ./config/ ./logger/
+
+test-unit-all: ## Run all unit tests (all packages)
+	@echo "$(GREEN)Running all unit tests...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && go test -v ./...
+
+test-unit-coverage-all: ## Run all unit tests with coverage report
+	@echo "$(GREEN)Running all unit tests with coverage...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && go test -cover ./...
+
+test-unit-verbose: ## Run unit tests with verbose output and coverage
+	@echo "$(GREEN)Running unit tests (verbose + coverage)...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && go test -v -cover ./document_queue/ ./auth/ ./utils/ ./config/ ./logger/
+
+test-unit-coverage-html: ## Generate HTML coverage report
+	@echo "$(GREEN)Generating HTML coverage report...$(NC)"
+	@cd ../docker/api_gateway/api_gateway && \
+		go test -coverprofile=coverage.out ./... && \
+		go tool cover -html=coverage.out -o coverage.html && \
+		echo "$(GREEN)Coverage report generated: coverage.html$(NC)" && \
+		echo "$(BLUE)Open with: xdg-open ../docker/api_gateway/api_gateway/coverage.html$(NC)"
+
 ##@ Health Checks
 
 health: health-mysql health-nats health-qdrant health-model health-api ## Check health of all services
