@@ -24,6 +24,8 @@ spec:
       volumes:
         - name: request-logs
           emptyDir: {}
+        - name: dlq-logs
+          emptyDir: {}
         - name: fluent-bit-storage
           emptyDir: {}
         - name: fluent-bit-config
@@ -63,6 +65,8 @@ spec:
           volumeMounts:
             - name: request-logs
               mountPath: /var/log/api-gateway
+            - name: dlq-logs
+              mountPath: /var/log/api-gateway/dlq
         - name: fluentbit
           image: fluent/fluent-bit:3.2.6
           ports:

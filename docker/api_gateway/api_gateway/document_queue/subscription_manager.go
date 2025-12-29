@@ -2,7 +2,7 @@ package document_queue
 
 import (
 	"api_gateway/config"
-	"api_gateway/db"
+	"api_gateway/dlq"
 	"api_gateway/logger"
 	"api_gateway/metrics"
 	"api_gateway/model"
@@ -28,7 +28,7 @@ type SubscriptionManager struct {
 }
 
 // deadLetterHandler processes messages that have exceeded their retry limit
-// This stores the failed message in the database for manual inspection
+// This stores the failed message in Redis with TTL for ephemeral storage
 func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 	logger.Errorf("Dead letter message received for site %d, document ID %d after %d retries. Last error: %s",
 		payload.SiteId, payload.Id, payload.RetryCount, payload.ErrorMessage)
@@ -40,8 +40,8 @@ func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 		payloadJSON = "{}" // Use empty JSON if marshaling fails
 	}
 
-	// Store in database for manual inspection
-	err = db.InsertDeadLetter(
+	// Store in Redis DLQ with TTL
+	err = dlq.StoreDLQMessage(
 		payload.SiteId,
 		payload.Id,
 		subject,
@@ -50,7 +50,7 @@ func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 		payload.RetryCount,
 	)
 	if err != nil {
-		logger.Errorf("Failed to store dead letter in database: %v", err)
+		logger.Errorf("Failed to store dead letter in Redis: %v", err)
 		return err
 	}
 

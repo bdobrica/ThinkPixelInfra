@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"api_gateway/auth"
+	"api_gateway/config"
 	"api_gateway/db"
+	"api_gateway/dlq"
 	"api_gateway/document_queue"
 	"api_gateway/handlers"
 	"api_gateway/logger"
@@ -28,6 +30,15 @@ func main() {
 
 	// Initialize Router
 	r := mux.NewRouter()
+
+	// Initialize DLQ system with Redis
+	redisAddr := config.GetEnv("API_GATEWAY_DLQ_REDIS_ADDR", "localhost:6379")
+	redisPass := config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
+	if err := dlq.InitializeDLQ(redisAddr, redisPass); err != nil {
+		logger.Warningf("Failed to initialize DLQ: %v (continuing without DLQ)", err)
+	} else {
+		logger.Infof("DLQ system initialized successfully")
+	}
 
 	// Initialize the Document Queue
 	dq := document_queue.NewDocumentQueue()
@@ -59,6 +70,10 @@ func main() {
 
 	// Register Routes
 	r.HandleFunc("/register", register.RegisterHandler).Methods("POST")
+
+	// DLQ Routes (protected)
+	r.Handle("/dlq/stats", middleware.JWTMiddleware(http.HandlerFunc(handlers.DLQStatsHandler))).Methods("GET")
+	r.Handle("/dlq/messages", middleware.JWTMiddleware(http.HandlerFunc(handlers.DLQMessagesHandler))).Methods("GET")
 
 	// Document Queue Subscription
 	sm := document_queue.NewSubscriptionManager(dq)
