@@ -9,6 +9,7 @@ import (
 
 	"api_gateway/config"
 	"api_gateway/logger"
+	"api_gateway/metrics"
 	"api_gateway/utils"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -58,11 +59,29 @@ func GetDBConnection() (*sql.DB, error) {
 		if err != nil {
 			logger.Errorf("Failed to ping database: %v", err)
 		}
+
+		// Start periodic metrics collection
+		go collectDBMetrics()
 	})
 	if err != nil {
 		return nil, err
 	}
 	return dbInstance, nil
+}
+
+// collectDBMetrics periodically collects database connection pool metrics
+func collectDBMetrics() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if dbInstance != nil {
+			stats := dbInstance.Stats()
+			metrics.DBConnections.WithLabelValues("open").Set(float64(stats.OpenConnections))
+			metrics.DBConnections.WithLabelValues("idle").Set(float64(stats.Idle))
+			metrics.DBConnections.WithLabelValues("in_use").Set(float64(stats.InUse))
+		}
+	}
 }
 
 // CloseDBConnection closes the database connection
@@ -77,6 +96,7 @@ func CloseDBConnection() error {
 func GetAPIKeyDetails(hashedKey string) (APIKeyDetails, error) {
 	dbConn, err := GetDBConnection()
 	if err != nil {
+		metrics.DBQueriesTotal.WithLabelValues("get_api_key", "failure").Inc()
 		return APIKeyDetails{}, err
 	}
 
@@ -89,12 +109,14 @@ func GetAPIKeyDetails(hashedKey string) (APIKeyDetails, error) {
 
 	var keyDetails APIKeyDetails
 	if err := row.Scan(&keyDetails.ID, &keyDetails.IndexingNodeType, &keyDetails.IndexingNode, &keyDetails.ExpiresAt, &keyDetails.MaxSearchResults, &keyDetails.Model, &keyDetails.ChunkSize, &keyDetails.ChunkOverlap); err != nil {
+		metrics.DBQueriesTotal.WithLabelValues("get_api_key", "failure").Inc()
 		if errors.Is(err, sql.ErrNoRows) {
 			return APIKeyDetails{}, errors.New("invalid API key")
 		}
 		return APIKeyDetails{}, fmt.Errorf("database query error %v", err)
 	}
 
+	metrics.DBQueriesTotal.WithLabelValues("get_api_key", "success").Inc()
 	return keyDetails, nil
 }
 

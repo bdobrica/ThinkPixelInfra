@@ -3,6 +3,7 @@ package document_queue
 import (
 	"api_gateway/config"
 	"api_gateway/logger"
+	"api_gateway/metrics"
 	"api_gateway/model"
 	"context"
 	"math/rand"
@@ -67,8 +68,11 @@ func subscriberHandler(payload *DocumentQueuePayload) error {
 	}
 	logger.Debugf("CacheEntry for site ID %d: %+v", payload.SiteId, cacheEntry)
 
-	// Call model API to get embeddings
+	// Call model API to get embeddings (with metrics)
+	start := time.Now()
 	response, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
+	metrics.ModelLatency.WithLabelValues(cacheEntry.Model, "embeddings").Observe(time.Since(start).Seconds())
+
 	if err != nil {
 		logger.Errorf("Error retrieving embeddings: %v", err)
 		return err

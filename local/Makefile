@@ -149,6 +149,10 @@ test-db-nats: ## Test database connection pooling and NATS error handling
 	@echo "$(GREEN)Testing database & NATS error handling...$(NC)"
 	@bash tests/test-database-nats.sh
 
+test-metrics: ## Test Prometheus metrics endpoint
+	@echo "$(GREEN)Testing Prometheus metrics...$(NC)"
+	@bash tests/test-metrics.sh
+
 test-graceful-shutdown: ## Test graceful shutdown
 	@echo "$(GREEN)Testing graceful shutdown...$(NC)"
 	@cd tests && bash test-graceful-shutdown.sh

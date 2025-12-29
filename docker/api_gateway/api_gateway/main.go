@@ -18,6 +18,7 @@ import (
 	"api_gateway/register"
 
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -39,6 +40,9 @@ func main() {
 
 	// Health Check Route
 	r.HandleFunc("/ready", handlers.ReadyHandler).Methods("GET")
+
+	// Metrics Route
+	r.Handle("/metrics", promhttp.Handler()).Methods("GET")
 
 	// Auth Routes
 	r.HandleFunc("/auth/token", auth.AuthHandler).Methods("POST")
@@ -63,7 +67,7 @@ func main() {
 	// Configure HTTP server with timeouts
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      r,
+		Handler:      middleware.MetricsMiddleware(r),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
