@@ -1,8 +1,8 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: nats
-  namespace: nats
+  name: reflector
+  namespace: reflector
 spec:
-  url: https://nats-io.github.io/k8s/helm/charts/
+  url: https://github.com/emberstack/helm-charts
   interval: 1h

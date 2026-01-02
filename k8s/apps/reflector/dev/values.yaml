@@ -1,0 +1,6 @@
+replicaCount: 1
+tolerations:
+  - key: "dev.thinkpixel.io/taint"
+    operator: "Equal"
+    value: "monitor"
+    effect: "NoSchedule"

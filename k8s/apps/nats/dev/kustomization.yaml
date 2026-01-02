@@ -8,6 +8,7 @@ resources:
   - ./nats-nkey-sealed-secret.yaml
 configMapGenerator:
   - name: nats
+    namespace: nats
     files:
       - values.yaml
 generatorOptions:

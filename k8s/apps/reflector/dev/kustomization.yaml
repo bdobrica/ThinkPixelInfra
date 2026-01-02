@@ -4,8 +4,8 @@ resources:
   - ../base/helmrelease.yaml
   - ../base/helmrepository.yaml
 configMapGenerator:
-  - name: cert-manager
-    namespace: cert-manager
+  - name: reflector
+    namespace: reflector
     files:
       - values.yaml
 generatorOptions:
