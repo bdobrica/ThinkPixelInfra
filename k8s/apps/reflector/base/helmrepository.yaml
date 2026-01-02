@@ -4,5 +4,5 @@ metadata:
   name: reflector
   namespace: reflector
 spec:
-  url: https://github.com/emberstack/helm-charts
+  url: https://emberstack.github.io/helm-charts
   interval: 1h
