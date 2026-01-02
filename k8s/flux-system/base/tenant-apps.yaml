@@ -7,13 +7,16 @@ metadata:
     fluxcd.controlplane.io/reconcileEvery: "5m"
 spec:
   inputs:
+    - tenant: cert-manager
+      environment: dev
+      privileged: true
+    - tenant: reflector
+      environment: dev
+      privileged: true
     - tenant: monitoring
       environment: dev
     - tenant: thinkpixel
       environment: dev
-    - tenant: cert-manager
-      environment: dev
-      privileged: true
     - tenant: nats
       environment: dev
   resources:
