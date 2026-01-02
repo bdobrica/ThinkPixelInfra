@@ -1,21 +1,21 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: nats
-  namespace: nats
+  name: reflector
+  namespace: reflector
 spec:
-  releaseName: nats
+  releaseName: reflector
   serviceAccountName: flux-operator
-  targetNamespace: nats
+  targetNamespace: reflector
   chart:
     spec:
-      chart: nats
-      version: "1.*"
+      chart: kubernetes-reflector
+      version: "9.*"
       sourceRef:
         kind: HelmRepository
-        name: nats
+        name: reflector
   interval: 1h
   valuesFrom:
     - kind: ConfigMap
-      name: nats
+      name: reflector
       valuesKey: values.yaml
