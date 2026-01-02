@@ -9,7 +9,7 @@ spec:
   targetNamespace: reflector
   chart:
     spec:
-      chart: kubernetes-reflector
+      chart: reflector
       version: "9.*"
       sourceRef:
         kind: HelmRepository
