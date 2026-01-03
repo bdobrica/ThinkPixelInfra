@@ -55,3 +55,34 @@ subjects:
   - kind: ServiceAccount
     name: flux
     namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: monitoring-kube-prometheus-flux
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames:
+      - monitoring-kube-prometheus-coredns
+      - monitoring-kube-prometheus-kube-controller-manager
+      - monitoring-kube-prometheus-kube-etcd
+      - monitoring-kube-prometheus-kube-proxy
+      - monitoring-kube-prometheus-kube-scheduler
+      - monitoring-kube-prometheus-kubelet
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: monitoring-kube-prometheus-flux
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: flux
+    namespace: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: monitoring-kube-prometheus-flux
