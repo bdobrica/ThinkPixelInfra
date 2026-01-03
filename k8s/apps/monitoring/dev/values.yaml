@@ -1,0 +1,27 @@
+grafana:
+  enabled: true
+  admin:
+    existingSecret: grafana
+    userKey: admin-user
+    passwordKey: admin-password
+  tolerations:
+    - key: "dev.thinkpixel.io/taint"
+      operator: "Equal"
+      value: "monitor"
+      effect: "NoSchedule"
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    tolerations:
+      - key: "dev.thinkpixel.io/taint"
+        operator: "Equal"
+        value: "monitor"
+        effect: "NoSchedule"
+prometheusOperator:
+  tolerations:
+    - key: "dev.thinkpixel.io/taint"
+      operator: "Equal"
+      value: "monitor"
+      effect: "NoSchedule"
+kubePrometheusNodeAlerting:
+  enabled: false
