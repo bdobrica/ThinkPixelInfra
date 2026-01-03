@@ -22,6 +22,26 @@ rules:
       - probes.monitoring.coreos.com
       - thanosrulers.monitoring.coreos.com
     verbs: ["update", "patch", "delete"]
+
+  # allow reading ClusterRoles
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames:
+      - monitoring-grafana-clusterrole
+      - monitoring-kube-prometheus-operator
+      - monitoring-kube-prometheus-prometheus
+      - monitoring-kube-state-metrics
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # allow reading ClusterRoleBindings for existing bindings
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    resourceNames:
+      - monitoring-grafana-clusterrolebinding
+      - monitoring-kube-prometheus-operator
+      - monitoring-kube-prometheus-prometheus
+      - monitoring-kube-state-metrics
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
