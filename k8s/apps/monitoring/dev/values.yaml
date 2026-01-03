@@ -1,7 +1,3 @@
-crds:
-  enabled: false
-alertmanager:
-  enabled: false
 grafana:
   enabled: true
   admin:
