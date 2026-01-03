@@ -4,6 +4,7 @@ metadata:
   name: monitoring
 spec:
   releaseName: monitoring
+  targetNamespace: monitoring
   chart:
     spec:
       chart: kube-prometheus-stack
