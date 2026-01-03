@@ -6,7 +6,6 @@ metadata:
 spec:
   releaseName: cert-manager
   serviceAccountName: flux-operator
-  targetNamespace: cert-manager
   chart:
     spec:
       chart: cert-manager
@@ -17,5 +16,5 @@ spec:
   interval: 1h
   valuesFrom:
     - kind: ConfigMap
-      name: cert-manager
+      name: cert-manager-${ENVIRONMENT}
       valuesKey: values.yaml
