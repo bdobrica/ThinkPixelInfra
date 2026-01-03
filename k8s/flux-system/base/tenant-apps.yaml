@@ -15,6 +15,7 @@ spec:
       privileged: true
     - tenant: monitoring
       environment: dev
+      privileged: true
     - tenant: thinkpixel
       environment: dev
     - tenant: nats
