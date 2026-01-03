@@ -4,6 +4,10 @@ metadata:
   name: nats
 spec:
   secretName: nats-tls-secret
+  secretTemplate:
+    annotations:
+      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "thinkpixel"
   issuerRef:
     name: nats
     kind: Issuer
