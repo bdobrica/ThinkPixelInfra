@@ -2,8 +2,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: flux-prom-operator-crds
+  name: monitoring-kube-prometheus-flux
 rules:
+  # allow creating CRDs (can't reliably restrict by name for create)
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch", "create"]
+
+  # restrict mutation of existing CRDs by name
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     resourceNames:
@@ -15,16 +21,16 @@ rules:
       - podmonitors.monitoring.coreos.com
       - probes.monitoring.coreos.com
       - thanosrulers.monitoring.coreos.com
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: flux-prom-operator-crds-monitoring
+  name: monitoring-kube-prometheus-flux
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: flux-prom-operator-crds
+  name: monitoring-kube-prometheus-flux
 subjects:
   - kind: ServiceAccount
     name: flux
