@@ -1,6 +1,7 @@
+crds:
+  enabled: false
 grafana:
   enabled: true
-  namespaceOverride: monitoring
   admin:
     existingSecret: grafana
     userKey: admin-user
@@ -10,10 +11,7 @@ grafana:
       operator: "Equal"
       value: "monitor"
       effect: "NoSchedule"
-prometheus-node-exporter:
-  namespaceOverride: monitoring
 prometheus:
-  namespaceOverride: monitoring
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
     tolerations:
@@ -22,9 +20,6 @@ prometheus:
         value: "monitor"
         effect: "NoSchedule"
 prometheusOperator:
-  namespaces:
-    additional:
-      - monitoring
   tolerations:
     - key: "dev.thinkpixel.io/taint"
       operator: "Equal"
