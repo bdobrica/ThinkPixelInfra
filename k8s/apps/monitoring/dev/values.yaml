@@ -23,7 +23,8 @@ prometheus:
         effect: "NoSchedule"
 prometheusOperator:
   namespaces:
-    - monitoring
+    additional:
+      - monitoring
   tolerations:
     - key: "dev.thinkpixel.io/taint"
       operator: "Equal"
