@@ -2,11 +2,8 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: nats
-  namespace: nats
 spec:
   releaseName: nats
-  serviceAccountName: flux-operator
-  targetNamespace: nats
   chart:
     spec:
       chart: nats

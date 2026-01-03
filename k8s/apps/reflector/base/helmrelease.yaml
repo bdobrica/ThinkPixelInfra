@@ -2,11 +2,9 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: reflector
-  namespace: reflector
 spec:
   releaseName: reflector
   serviceAccountName: flux-operator
-  targetNamespace: reflector
   chart:
     spec:
       chart: reflector
@@ -17,5 +15,5 @@ spec:
   interval: 1h
   valuesFrom:
     - kind: ConfigMap
-      name: reflector
+      name: reflector-${ENVIRONMENT}
       valuesKey: values.yaml

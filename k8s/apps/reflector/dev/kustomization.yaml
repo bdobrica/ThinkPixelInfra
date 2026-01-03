@@ -4,8 +4,7 @@ resources:
   - ../base/helmrelease.yaml
   - ../base/helmrepository.yaml
 configMapGenerator:
-  - name: reflector
-    namespace: reflector
+  - name: reflector-${ENVIRONMENT}
     files:
       - values.yaml
 generatorOptions:
