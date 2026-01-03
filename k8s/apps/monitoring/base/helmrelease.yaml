@@ -4,6 +4,7 @@ metadata:
   name: monitoring
 spec:
   releaseName: monitoring
+  serviceAccountName: flux
   chart:
     spec:
       chart: kube-prometheus-stack
