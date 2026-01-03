@@ -3,6 +3,7 @@ resources:
   - ../base/helmrelease.yaml
   - ../base/helmrepository.yaml
   - ./grafana-sealed-secret.yaml
+  - ./rbac.yaml
 configMapGenerator:
   - name: monitoring
     files:
