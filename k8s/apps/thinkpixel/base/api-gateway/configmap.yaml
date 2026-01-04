@@ -17,6 +17,7 @@ data:
   API_GATEWAY_VALIDATION_MAX_ATTEMPTS: "3"
   API_GATEWAY_LOG_FILE_PATH_TEMPLATE: /var/log/api-gateway/requests-%s.jsonl
   API_GATEWAY_LOG_MAX_FILES: "50"
+  API_GATEWAY_NATS_URL: nats://nats.nats.svc.dev.thinkpixel.io:4222
   LOCAL: "1"
 ---
 apiVersion: v1
