@@ -55,6 +55,12 @@ data:
           - source_labels: [__meta_kubernetes_endpoint_port_name]
             action: keep
             regex: metrics
+          # add node label (works when endpoints are backed by pods/nodes)
+          - source_labels: [__meta_kubernetes_endpoint_node_name]
+            target_label: node
+          # optional: keep useful pod metadata if present
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
       - job_name: kubernetes-pods
         kubernetes_sd_configs:
           - role: pod
