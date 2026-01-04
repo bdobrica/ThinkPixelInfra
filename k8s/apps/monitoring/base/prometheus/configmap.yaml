@@ -20,6 +20,11 @@ data:
         relabel_configs:
           - action: labelmap
             regex: __meta_kubernetes_node_label_(.+)
+          # Ensure we scrape kubelet on 10250 on the node IP
+          - action: replace
+            source_labels: [__meta_kubernetes_node_address_InternalIP]
+            target_label: __address__
+            replacement: $1:10250
       - job_name: kubernetes-cadvisor
         scheme: https
         metrics_path: /metrics/cadvisor
@@ -32,30 +37,55 @@ data:
         relabel_configs:
           - action: labelmap
             regex: __meta_kubernetes_node_label_(.+)
+          - action: replace
+            source_labels: [__meta_kubernetes_node_address_InternalIP]
+            target_label: __address__
+            replacement: $1:10250
       - job_name: node-exporter
         kubernetes_sd_configs:
-          - role: node
+          - role: endpoints
         relabel_configs:
-          - source_labels: [__address__]
-            regex: (.+):10250
-            replacement: ${1}:9100
-            target_label: __address__
+          # Optional: only scrape endpoints in the monitoring namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: monitoring
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
       - job_name: kubernetes-pods
-        scheme: https
-        tls_config:
-          insecure_skip_verify: true
-        authorization:
-          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
         kubernetes_sd_configs:
           - role: pod
         relabel_configs:
+          # Only pods with prometheus.io/scrape="true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          # If you want, allow prometheus.io/path override
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # Use prometheus.io/port for the actual scrape address
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+          # If you want, allow prometheus.io/scheme override
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+            action: replace
+            target_label: __scheme__
+            regex: (https?)
+            replacement: $1
+          # Your labels
           - action: labelmap
             regex: __meta_kubernetes_pod_label_(.+)
           - source_labels: [__meta_kubernetes_namespace]
-            action: replace
             target_label: namespace
           - source_labels: [__meta_kubernetes_pod_name]
-            action: replace
             target_label: pod
       - job_name: fluent-bit-metrics
         scheme: http
@@ -66,8 +96,13 @@ data:
           - source_labels: [__meta_kubernetes_service_name]
             regex: fluent-bit-metrics
             action: keep
+          # Optional if multiple ports:
+          - source_labels: [__meta_kubernetes_service_port_name]
+            regex: http
+            action: keep
       - job_name: qdrant-metrics
         scheme: http
+        metrics_path: /metrics
         kubernetes_sd_configs:
           - role: service
         relabel_configs:
