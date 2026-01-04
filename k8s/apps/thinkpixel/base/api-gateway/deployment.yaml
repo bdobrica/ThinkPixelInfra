@@ -26,6 +26,12 @@ spec:
           emptyDir: {}
         - name: dlq-logs
           emptyDir: {}
+        - name: nats-tls-secret
+          secret:
+            secretName: nats-tls-secret
+        - name: nats-nkey-secret
+          secret:
+            secretName: nats-nkey-secret
         - name: fluent-bit-storage
           emptyDir: {}
         - name: fluent-bit-config
@@ -67,6 +73,12 @@ spec:
               mountPath: /var/log/api-gateway
             - name: dlq-logs
               mountPath: /var/log/api-gateway/dlq
+            - name: nats-tls-secret
+              mountPath: /etc/nats/tls
+              readOnly: true
+            - name: nats-nkey-secret
+              mountPath: /etc/nats/nkeys
+              readOnly: true
         - name: fluentbit
           image: fluent/fluent-bit:3.2.6
           ports:
