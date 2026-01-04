@@ -23,10 +23,10 @@ type DocumentQueue struct {
 // Returns the DocumentQueue and any error encountered.
 func NewDocumentQueue() *DocumentQueue {
 	natsURL := config.GetEnv("API_GATEWAY_NATS_URL", "nats://nats:4222")
-	nkeyPath := config.GetEnv("API_GATEWAY_NATS_NKEY_PATH", "/etc/nats/nkeys/default.nk")
-	tlsCertPath := config.GetEnv("API_GATEWAY_NATS_TLS_CERT", "/etc/nats/tls/cert.pem")
-	tlsKeyPath := config.GetEnv("API_GATEWAY_NATS_TLS_KEY", "/etc/nats/tls/key.pem")
-	tlsCAPath := config.GetEnv("API_GATEWAY_NATS_TLS_CA", "/etc/nats/tls/ca.pem")
+	nkeyPath := config.GetEnv("API_GATEWAY_NATS_NKEY_PATH", "/etc/nats/nkeys/nats.nk")
+	tlsCertPath := config.GetEnv("API_GATEWAY_NATS_TLS_CERT", "/etc/nats/tls/tls.crt")
+	tlsKeyPath := config.GetEnv("API_GATEWAY_NATS_TLS_KEY", "/etc/nats/tls/tls.key")
+	tlsCAPath := config.GetEnv("API_GATEWAY_NATS_TLS_CA", "/etc/nats/tls/ca.crt")
 	subject := config.GetEnv("API_GATEWAY_DOCUMENT_QUEUE_SUBJECT", "store.jobs")
 
 	var opts []nats.Option
