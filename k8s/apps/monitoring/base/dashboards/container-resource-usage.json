@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -77,8 +77,7 @@
                 "value": 80
               }
             ]
-          },
-          "unit": "percent"
+          }
         },
         "overrides": []
       },
@@ -107,22 +106,16 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "bec9yyhsqo9hca"
+            "uid": "ef95h9wayitj4b"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "100 - (avg by(node) (irate(node_cpu_seconds_total{mode=\"idle\", node=~\"$node\"}[5m])) * 100)",
-          "format": "CPU Usage",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "interval": "",
-          "legendFormat": "CPU Usage {{node}}",
+          "expr": "sum by (namespace, pod, container) (\r\n  rate(container_cpu_usage_seconds_total{container=~\"$container\", container!=\"POD\", namespace=~\"$namespace\"}[5m])\r\n)",
+          "legendFormat": "CPU Cores {{pod}}",
           "range": true,
-          "refId": "A",
-          "useBackend": false
+          "refId": "A"
         }
       ],
-      "title": "CPU Usage (%)",
+      "title": "CPU Cores",
       "type": "timeseries"
     },
     {
@@ -182,7 +175,7 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -209,225 +202,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "bec9yyhsqo9hca"
-          },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(1 - (node_memory_MemAvailable_bytes{node=~\"$node\"} / node_memory_MemTotal_bytes{node=~\"$node\"})) * 100",
-          "format": "CPU Usage",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "interval": "",
-          "legendFormat": "Mem Usage {{node}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        }
-      ],
-      "title": "Memory Usage (%)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95h9wayitj4b"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "id": 3,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "100 * (\r\n  1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\", node=~\"$node\"}\r\n      / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs\", node=~\"$node\"}\r\n)",
-          "legendFormat": "Disk Usage {{node}}",
+          "expr": "sum by (namespace, pod, container) (\r\n  container_memory_working_set_bytes{container=~\"$container\", container!=\"POD\", namespace=~\"$namespace\"}\r\n)",
+          "legendFormat": "WSS {{pod}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Disk Usage (%)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95h9wayitj4b"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "binBps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum by (node) (rate(node_disk_read_bytes_total{device!~\"loop.*|ram.*\", node=~\"$node\"}[$rate]))",
-          "legendFormat": "Read I/O {{node}}",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95h9wayitj4b"
-          },
-          "editorMode": "code",
-          "expr": "sum by (node) (rate(node_disk_written_bytes_total{device!~\"loop.*|ram.*\", node=~\"$node\"}[$rate]))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Write I/O {{node}}",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Disk I/O",
+      "title": "Working Set Memory",
       "type": "timeseries"
     },
     {
@@ -495,7 +277,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 8
       },
       "id": 4,
       "options": {
@@ -515,8 +297,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (node) (rate(node_network_receive_bytes_total{device!~\"lo|cni.*|veth.*\", node=~\"$node\"}[$rate]))",
-          "legendFormat": "RX {{node}}",
+          "expr": "sum by (namespace, pod, container) (\r\n  rate(container_fs_reads_total{container=~\"$container\", container!=\"POD\", namespace=~\"$namespace\"}[$rate])\r\n)",
+          "legendFormat": "Read {{pod}}",
           "range": true,
           "refId": "A"
         },
@@ -526,15 +308,15 @@
             "uid": "ef95h9wayitj4b"
           },
           "editorMode": "code",
-          "expr": "sum by (node) (rate(node_network_transmit_bytes_total{device!~\"lo|cni.*|veth.*\", node=~\"$node\"}[$rate]))",
+          "expr": "sum by (namespace, pod, container) (\r\n  rate(container_fs_writes_total{container=~\"$container\", container!=\"POD\", namespace=~\"$namespace\"}[$rate])\r\n)",
           "hide": false,
           "instant": false,
-          "legendFormat": "TX {{node}}",
+          "legendFormat": "Write {{pod}}",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Networking I/O",
+      "title": "Disk I/O",
       "type": "timeseries"
     }
   ],
@@ -548,30 +330,100 @@
         "allowCustomValue": false,
         "current": {
           "text": [
-            "k8s-master-01",
-            "k8s-worker-api-01",
-            "k8s-worker-api-02",
-            "k8s-worker-api-03",
-            "k8s-worker-monitor-01"
+            "flux-system",
+            "kube-system",
+            "monitoring",
+            "nats",
+            "thinkpixel"
           ],
           "value": [
-            "k8s-master-01",
-            "k8s-worker-api-01",
-            "k8s-worker-api-02",
-            "k8s-worker-api-03",
-            "k8s-worker-monitor-01"
+            "flux-system",
+            "kube-system",
+            "monitoring",
+            "nats",
+            "thinkpixel"
           ]
         },
-        "definition": "label_values(node_uname_info,nodename)",
-        "description": "",
-        "includeAll": false,
-        "label": "Node",
+        "definition": "label_values(container_cpu_usage_seconds_total,namespace)",
+        "label": "Namespace",
         "multi": true,
-        "name": "node",
+        "name": "namespace",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(node_uname_info,nodename)",
+          "query": "label_values(container_cpu_usage_seconds_total,namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": [
+            "api-gateway",
+            "cert-manager-cainjector",
+            "cert-manager-controller",
+            "cert-manager-webhook",
+            "coredns",
+            "fluentbit",
+            "grafana",
+            "kube-prometheus-stack",
+            "kube-state-metrics",
+            "local-path-provisioner",
+            "manager",
+            "metrics-server",
+            "ml-model",
+            "mysql",
+            "nats",
+            "nats-box",
+            "node-exporter",
+            "prometheus",
+            "qdrant",
+            "redis-master",
+            "redis-replica",
+            "redis-sentinel",
+            "reflector",
+            "reloader",
+            "sealed-secrets-controller"
+          ],
+          "value": [
+            "api-gateway",
+            "cert-manager-cainjector",
+            "cert-manager-controller",
+            "cert-manager-webhook",
+            "coredns",
+            "fluentbit",
+            "grafana",
+            "kube-prometheus-stack",
+            "kube-state-metrics",
+            "local-path-provisioner",
+            "manager",
+            "metrics-server",
+            "ml-model",
+            "mysql",
+            "nats",
+            "nats-box",
+            "node-exporter",
+            "prometheus",
+            "qdrant",
+            "redis-master",
+            "redis-replica",
+            "redis-sentinel",
+            "reflector",
+            "reloader",
+            "sealed-secrets-controller"
+          ]
+        },
+        "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"},container)",
+        "label": "Container",
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"},container)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -629,8 +481,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "ThinkPixel Dev Node Resource Usage",
-  "uid": "eeca0jpvbib5sd",
-  "version": 5,
+  "title": "ThinkPixel Dev Container Resource Usage",
+  "uid": "bf96jlvp0r0n4a",
+  "version": 2,
   "weekStart": ""
 }
