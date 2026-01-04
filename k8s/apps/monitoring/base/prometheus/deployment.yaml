@@ -10,6 +10,8 @@ spec:
     matchLabels:
       app.kubernetes.io/name: prometheus
       app.kubernetes.io/component: monitoring
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -22,6 +24,7 @@ spec:
           operator: "Equal"
           value: "monitor"
           effect: "NoSchedule"
+      terminationGracePeriodSeconds: 60
       containers:
         - name: prometheus
           image: prom/prometheus:v3.1.0
