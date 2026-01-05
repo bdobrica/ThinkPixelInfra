@@ -115,6 +115,39 @@ data:
           - source_labels: [__meta_kubernetes_service_name]
             regex: qdrant
             action: keep
+          - source_labels: [__meta_kubernetes_service_port_name]
+            regex: "http"
+            action: keep
         authorization:
           type: Bearer
           credentials_file: /etc/prometheus/secrets/qdrant_api_key
+      - job_name: api-gateway-metrics
+        scheme: http
+        metrics_path: /metrics
+        kubernetes_sd_configs:
+          - role: service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace]
+            regex: thinkpixel
+            action: keep
+          - source_labels: [__meta_kubernetes_service_name]
+            regex: api-gateway
+            action: keep
+          - source_labels: [__meta_kubernetes_service_port_number]
+            regex: "8080"
+            action: keep
+      - job_name: nats-metrics
+        scheme: http
+        metrics_path: /metrics
+        kubernetes_sd_configs:
+          - role: service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace]
+            regex: nats
+            action: keep
+          - source_labels: [__meta_kubernetes_service_name]
+            regex: prometheus-nats-exporter
+            action: keep
+          - source_labels: [__meta_kubernetes_service_port_number]
+            regex: "7777"
+            action: keep

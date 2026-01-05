@@ -28,3 +28,5 @@ natsBox:
         secretName: nats-tls-secret
       merge:
         url: nats://nats.nats.svc.${CLUSTER_DOMAIN}:4222
+promExporter:
+  enabled: true
