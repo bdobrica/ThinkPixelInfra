@@ -17,6 +17,9 @@ config:
         - nkey: UDFMYYFHYUWB45ZERYKFE4PBXSJZ4UAYQ7YBI3L64F6K4MCLUEJHKKEZ
 service:
   type: ClusterIP
+  ports:
+    monitor:
+      enabled: true
 natsBox:
   enabled: true
   contexts:
