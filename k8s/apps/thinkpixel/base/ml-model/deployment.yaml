@@ -41,6 +41,8 @@ spec:
           env:
             - name: MODEL_NUM_WORKERS
               value: "1"
+            - name: MODEL_LANGUAGES
+              value: "en,fr,de,es,it,ro"
           resources:
             limits:
               memory: 3Gi
