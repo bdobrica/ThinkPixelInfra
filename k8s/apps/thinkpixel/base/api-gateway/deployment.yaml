@@ -39,7 +39,7 @@ spec:
             name: fluent-bit-config
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.6.2
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.6.3
           ports:
             - containerPort: 8080
           envFrom:
@@ -57,6 +57,8 @@ spec:
             - name: API_GATEWAY_SITE_DB_DSN
               value: "$(API_GATEWAY_MYSQL_USER):$(MYSQL_PASSWORD)@tcp($(API_GATEWAY_MYSQL_HOST):$(API_GATEWAY_MYSQL_PORT))/$(API_GATEWAY_MYSQL_DB)"
             - name: API_GATEWAY_REDIS_PASSWORD
+              value: "$(REDIS_PASSWORD)"
+            - name: API_GATEWAY_DLQ_REDIS_PASSWORD
               value: "$(REDIS_PASSWORD)"
             - name: API_GATEWAY_QDRANT_API_KEY
               value: "$(QDRANT__SERVICE__API_KEY)"

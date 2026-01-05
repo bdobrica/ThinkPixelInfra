@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"api_gateway/auth"
-	"api_gateway/config"
 	"api_gateway/db"
 	"api_gateway/dlq"
 	"api_gateway/document_queue"
@@ -32,9 +31,7 @@ func main() {
 	r := mux.NewRouter()
 
 	// Initialize DLQ system with Redis
-	redisAddr := config.GetEnv("API_GATEWAY_DLQ_REDIS_ADDR", "localhost:6379")
-	redisPass := config.GetEnv("API_GATEWAY_REDIS_PASSWORD", "")
-	if err := dlq.InitializeDLQ(redisAddr, redisPass); err != nil {
+	if err := dlq.InitializeDLQ(); err != nil {
 		logger.Warningf("Failed to initialize DLQ: %v (continuing without DLQ)", err)
 	} else {
 		logger.Infof("DLQ system initialized successfully")

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,8 +66,38 @@ type DLQMessage struct {
 	PayloadJSON  string `json:"payload_json"`
 }
 
+// extractSentinelInfo extracts host, port and master name from sentinel address string
+// Format: <sentinel-address>:<port>/<master-node>
+func extractSentinelInfo(sentinelAddr string) (host string, port string, masterName string, err error) {
+	// Split the string into host:port and masterName
+	parts := strings.Split(sentinelAddr, "/")
+	if len(parts) != 2 {
+		logger.Errorf("Invalid sentinel address format: %s\n", sentinelAddr)
+		return "", "", "", fmt.Errorf("invalid sentinel address format: %s", sentinelAddr)
+	}
+
+	hostPort := parts[0]
+	masterName = parts[1]
+
+	// Split host:port into host and port
+	hostPortParts := strings.Split(hostPort, ":")
+	if len(hostPortParts) != 2 {
+		logger.Errorf("Invalid sentinel address format: %s\n", sentinelAddr)
+		return "", "", "", fmt.Errorf("invalid sentinel address format: %s", sentinelAddr)
+	}
+
+	host = hostPortParts[0]
+	port = hostPortParts[1]
+
+	return host, port, masterName, nil
+}
+
 // Initialize DLQ system with a dedicated Redis client
-func InitializeDLQ(redisAddr string, redisPassword string) error {
+// Reads configuration from environment variables:
+//
+//	API_GATEWAY_DLQ_REDIS_ADDR - Redis Sentinel address format: <sentinel-address>:<port>/<master-node>
+//	API_GATEWAY_REDIS_PASSWORD - Redis password (shared with main Redis)
+func InitializeDLQ() error {
 	dlqRedisClientLock.Lock()
 	defer dlqRedisClientLock.Unlock()
 
@@ -74,25 +105,40 @@ func InitializeDLQ(redisAddr string, redisPassword string) error {
 		return nil // Already initialized
 	}
 
-	// Create dedicated Redis client for DLQ
-	dlqRedisClient = redis.NewClient(&redis.Options{
-		Addr:         redisAddr,
-		Password:     redisPassword,
-		DB:           1, // Use DB 1 for DLQ to separate from main data
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
+	// Read configuration from environment
+	redisAddr := config.GetEnv("API_GATEWAY_DLQ_REDIS_ADDR", "redis-sentinel:26379/redis-primary")
+	redisPassword := config.GetEnv("API_GATEWAY_DLQ_REDIS_PASSWORD", "")
+	redisDb := config.GetEnvInt("API_GATEWAY_DLQ_REDIS_DB", 1)
+
+	// Parse sentinel address format
+	host, port, masterName, err := extractSentinelInfo(redisAddr)
+	if err != nil {
+		return fmt.Errorf("invalid sentinel address format: %w", err)
+	}
+
+	sentinelAddr := fmt.Sprintf("%s:%s", host, port)
+
+	// Create Redis Failover Client for DLQ
+	dlqRedisClient = redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:       masterName,
+		Password:         redisPassword,
+		SentinelPassword: redisPassword,
+		SentinelAddrs:    []string{sentinelAddr},
+		DB:               redisDb, // Use configured DB for DLQ to separate from main data
+		DialTimeout:      5 * time.Second,
+		ReadTimeout:      3 * time.Second,
+		WriteTimeout:     3 * time.Second,
 	})
 
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err := dlqRedisClient.Ping(ctx).Result(); err != nil {
-		return fmt.Errorf("failed to connect to Redis for DLQ: %w", err)
+		return fmt.Errorf("failed to connect to Redis Sentinel at %s / %s: %w", sentinelAddr, masterName, err)
 	}
 
-	logger.Infof("DLQ Redis client initialized (TTL=%s, Threshold=%d/%s)",
-		dlqTTL, dlqThreshold, dlqThresholdWin)
+	logger.Infof("DLQ Redis client initialized with Sentinel (Sentinel=%s, Master=%s, TTL=%s, Threshold=%d/%s)",
+		sentinelAddr, masterName, dlqTTL, dlqThreshold, dlqThresholdWin)
 
 	// Start background export worker if enabled
 	if dlqExportEnabled {
