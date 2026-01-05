@@ -1,5 +1,6 @@
 #!/bin/bash
-# API Gateway Integration Tests
+# API Gateway Basic Endpoint Tests
+# For comprehensive auth/store/search tests, see test-auth-store-search.sh
 
 set -e
 
@@ -15,7 +16,7 @@ TIMESTAMP=$(date +%s)
 TEST_DOMAIN="example-${TIMESTAMP}.com"
 TEST_PATH="/"
 
-echo -e "${BLUE}=== API Gateway Integration Tests ===${NC}"
+echo -e "${BLUE}=== API Gateway Basic Endpoint Tests ===${NC}"
 echo ""
 
 # Counter for tests

@@ -1,7 +1,9 @@
 package redisconn
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -251,10 +253,11 @@ func StoreEmbeddings(siteID int, indexingNode string, embeddings []model.Embeddi
 			maxDim = len(embedding.DenseVector)
 		}
 
-		embeddingBytes, err := json.Marshal(embedding.DenseVector)
+		// Convert embedding to binary format for RediSearch vector field
+		embeddingBytes, err := float32ToBytes(embedding.DenseVector)
 		if err != nil {
-			logger.Errorf("Error marshaling embedding: %v", err)
-			return storedCount, fmt.Errorf("failed to marshal embedding: %w", err)
+			logger.Errorf("Error converting embedding to bytes: %v", err)
+			return storedCount, fmt.Errorf("failed to convert embedding to bytes: %w", err)
 		}
 
 		fields := map[string]interface{}{
@@ -313,6 +316,17 @@ func StoreEmbeddings(siteID int, indexingNode string, embeddings []model.Embeddi
 	return storedCount, nil
 }
 
+// float32ToBytes converts a slice of float32 to a byte slice in little-endian format
+func float32ToBytes(floats []float32) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	for _, f := range floats {
+		if err := binary.Write(buf, binary.LittleEndian, f); err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
+}
+
 // SearchEmbeddings performs ANN search for a set of embeddings and returns top results
 func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.EmbeddingResponse, limit int) ([]map[string]interface{}, error) {
 	ctx := context.Background()
@@ -326,13 +340,14 @@ func SearchEmbeddings(siteId int, indexingNode string, embeddings []model.Embedd
 	}
 
 	for _, embedding := range embeddings {
-		embeddingBytes, err := json.Marshal(embedding.DenseVector)
+		// Convert float32 slice to binary format for RediSearch
+		embeddingBytes, err := float32ToBytes(embedding.DenseVector)
 		if err != nil {
-			logger.Errorf("Error marshaling embedding: %v", err)
-			return nil, fmt.Errorf("failed to marshal embedding: %w", err)
+			logger.Errorf("Error converting embedding to bytes: %v", err)
+			return nil, fmt.Errorf("failed to convert embedding to bytes: %w", err)
 		}
 
-		logger.Debugf("Performing search for embedding with size %d bytes", len(embeddingBytes))
+		logger.Debugf("Performing search for embedding with %d dimensions (%d bytes)", len(embedding.DenseVector), len(embeddingBytes))
 
 		cmd := client.Do(ctx, "FT.SEARCH", indexName,
 			fmt.Sprintf("*=>[KNN %d @embedding $query_vec AS score]", limit),

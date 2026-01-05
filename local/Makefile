@@ -130,8 +130,7 @@ db-backup: ## Backup database to local/backups/
 test: ## Run all tests
 	@echo "$(GREEN)Running all tests...$(NC)"
 	@$(MAKE) test-health
-	@$(MAKE) test-api
-	@echo "$(GREEN)All tests passed!$(NC)"
+	@$(MAKE) test-api	@$(MAKE) test-auth-store-search	@echo "$(GREEN)All tests passed!$(NC)"
 
 test-health: ## Test service health
 	@echo "$(GREEN)Testing service health...$(NC)"
@@ -140,6 +139,10 @@ test-health: ## Test service health
 test-api: ## Test API endpoints
 	@echo "$(GREEN)Testing API Gateway endpoints...$(NC)"
 	@bash tests/test-api.sh
+
+test-auth-store-search: ## Test authentication, store, and search with both Redis and Qdrant
+	@echo "$(GREEN)Testing Auth, Store, and Search (Redis + Qdrant)...$(NC)"
+	@bash tests/test-auth-store-search.sh
 
 test-store: ## Test Store handler with soft-fail behavior
 	@echo "$(GREEN)Testing Store handler...$(NC)"
