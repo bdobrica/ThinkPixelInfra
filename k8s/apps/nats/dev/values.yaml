@@ -15,11 +15,6 @@ config:
     authorization:
       users:
         - nkey: UDFMYYFHYUWB45ZERYKFE4PBXSJZ4UAYQ7YBI3L64F6K4MCLUEJHKKEZ
-service:
-  type: ClusterIP
-  ports:
-    monitor:
-      enabled: true
 natsBox:
   enabled: true
   contexts:
@@ -33,3 +28,10 @@ natsBox:
         url: nats://nats.nats.svc.${CLUSTER_DOMAIN}:4222
 promExporter:
   enabled: true
+podTemplate:
+  merge:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7777"
+        prometheus.io/path: "/metrics"
