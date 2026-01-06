@@ -45,10 +45,10 @@ spec:
               value: "en,fr,de,es,it,ro"
           resources:
             limits:
-              memory: 3Gi
+              memory: 4Gi
             requests:
               cpu: 1000m
-              memory: 3Gi
+              memory: 4Gi
           startupProbe:
             httpGet:
               path: /ping

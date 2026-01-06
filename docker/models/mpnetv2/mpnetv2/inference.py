@@ -43,6 +43,7 @@ from transformers import AutoModel, AutoTokenizer
 from .config import (
     LOCAL,
     LOG_LEVEL,
+    MODEL_BATCH_SIZE,
     MODEL_CHUNK_OVERLAP,
     MODEL_CHUNK_SIZE,
     MODEL_DEVICE,
@@ -173,23 +174,30 @@ def _process_task(context: zmq.Context):
 
             if not text_items:
                 raise EmptyBatchError("No valid text items after preparation.")
-
             logger.debug("Prepared %s text items for inference.", len(text_items))
 
-            batch_text = [item.get("text", "") for item in text_items]
+            results = []
 
-            # Batch encode and process with the model
-            logger.debug(
-                "Processing %s chunks of %s bytes...",
-                len(batch_text),
-                sum(len(text.encode("utf-8")) for text in batch_text),
-            )
-            batch_input = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
-            with torch.no_grad():
-                model_output = model(**batch_input)
+            for index in range(0, len(text_items), MODEL_BATCH_SIZE):
+                batch_items = text_items[index : index + MODEL_BATCH_SIZE]  # noqa: E203
 
-            results = build_results(text_items, batch_input, model_output)
+                logger.debug("Working with %s text items for inference.", len(batch_items))
 
+                batch_text = [item.get("text", "") for item in batch_items]
+
+                # Batch encode and process with the model
+                logger.debug(
+                    "Processing %s chunks of %s bytes...",
+                    len(batch_text),
+                    sum(len(text.encode("utf-8")) for text in batch_text),
+                )
+                batch_input = tokenizer(batch_text, padding=True, truncation=True, return_tensors="pt").to(device)
+                with torch.no_grad():
+                    model_output = model(**batch_input)
+                results.extend(build_results(batch_items, batch_input, model_output))
+                batch_items = None
+                batch_input = None
+                model_output = None
             logger.debug("Sending %s results...", len(results))
             response = {"results": results}
         except EmptyBatchError as e:

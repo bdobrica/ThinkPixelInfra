@@ -29,6 +29,6 @@ COPY --from=weights /opt/weights/snowflake-arctic/snowflake-arctic-embed-l-v2.0 
 COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY snowflake_arctic snowflake_arctic
 
-ENV VERSION="0.1.9"
+ENV VERSION="0.1.10"
 
 CMD ["python", "-m", "snowflake_arctic"]

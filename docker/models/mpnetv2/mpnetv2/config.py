@@ -13,8 +13,11 @@ Environment Variables:
     MODEL_ZMQ_WORKER_ADDR: ZMQ worker socket address (default: ipc:///tmp/mpnetv2.worker)
     MODEL_HTTP_PORT: HTTP API server port (default: 8000)
     MODEL_NUM_WORKERS: Number of inference worker processes (default: CPU count / 2)
+    MODEL_BATCH_SIZE: Default batch size for model inference (default: 16)
     MODEL_CHUNK_SIZE: Default maximum characters per text chunk (default: 1000)
     MODEL_CHUNK_OVERLAP: Default character overlap between chunks (default: 200)
+    MODEL_LANGUAGES (List[str]): Supported languages for text processing
+    MODEL_LANGUAGE_DETECTION_PATH: Path to language detection model file (default: /app/fasttext/lid.176.bin)
 
 Text Processing Configuration:
     The chunk size and overlap settings control how long texts are split into
@@ -56,6 +59,7 @@ MODEL_ZMQ_CLIENT_ADDR: str = os.getenv("MODEL_ZMQ_CLIENT_ADDR", "ipc:///tmp/mpne
 MODEL_ZMQ_WORKER_ADDR: str = os.getenv("MODEL_ZMQ_WORKER_ADDR", "ipc:///tmp/mpnetv2.worker")
 MODEL_HTTP_PORT: int = int(os.getenv("MODEL_HTTP_PORT", 8000))
 MODEL_NUM_WORKERS: int = max(1, int(os.getenv("MODEL_NUM_WORKERS", cpu_count() // 2)))
+MODEL_BATCH_SIZE: int = int(os.getenv("MODEL_BATCH_SIZE", 16))
 MODEL_CHUNK_SIZE: int = int(os.getenv("MODEL_CHUNK_SIZE", 1000))
 MODEL_CHUNK_OVERLAP: int = int(os.getenv("MODEL_CHUNK_OVERLAP", 200))
 MODEL_LANGUAGES: List[str] = list(
