@@ -31,14 +31,60 @@ const (
 	dlqKeyPrefix = "dlq:site:"
 )
 
+// getEnv retrieves an environment variable with a default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getEnvInt retrieves an integer environment variable with a default value
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// extractSentinelInfo extracts host, port and master name from sentinel address string
+// Format: <sentinel-address>:<port>/<master-node>
+func extractSentinelInfo(sentinelAddr string) (host string, port string, masterName string, err error) {
+	// Split the string into host:port and masterName
+	parts := strings.Split(sentinelAddr, "/")
+	if len(parts) != 2 {
+		return "", "", "", fmt.Errorf("invalid sentinel address format: %s (expected format: host:port/master)", sentinelAddr)
+	}
+
+	hostPort := parts[0]
+	masterName = parts[1]
+
+	// Split host:port into host and port
+	hostPortParts := strings.Split(hostPort, ":")
+	if len(hostPortParts) != 2 {
+		return "", "", "", fmt.Errorf("invalid sentinel address format: %s (expected format: host:port/master)", sentinelAddr)
+	}
+
+	host = hostPortParts[0]
+	port = hostPortParts[1]
+
+	return host, port, masterName, nil
+}
+
 var (
-	// Flags
+	// Flags (with environment variable fallbacks)
 	source      = flag.String("source", "redis", "Source: 'redis' or 'file'")
-	redisAddr   = flag.String("redis", "localhost:6379", "Redis address")
-	redisPass   = flag.String("redis-pass", "", "Redis password")
-	redisDB     = flag.Int("redis-db", 1, "Redis database number")
-	natsURL     = flag.String("nats", "nats://localhost:4222", "NATS URL")
-	natsSubject = flag.String("subject", "document.queue.main", "NATS subject to publish to")
+	redisAddr   = flag.String("redis", getEnv("API_GATEWAY_DLQ_REDIS_ADDR", "localhost:26379/mymaster"), "Redis Sentinel address (format: host:port/master)")
+	redisPass   = flag.String("redis-pass", getEnv("API_GATEWAY_DLQ_REDIS_PASSWORD", ""), "Redis password")
+	redisDB     = flag.Int("redis-db", getEnvInt("API_GATEWAY_DLQ_REDIS_DB", 1), "Redis database number")
+	natsURL     = flag.String("nats", getEnv("API_GATEWAY_NATS_URL", "nats://localhost:4222"), "NATS URL")
+	natsSubject = flag.String("subject", getEnv("API_GATEWAY_DOCUMENT_QUEUE_SUBJECT", "store.jobs"), "NATS subject to publish to")
+	natsNKey    = flag.String("nats-nkey", getEnv("API_GATEWAY_NATS_NKEY_PATH", ""), "NATS NKey file path")
+	natsTLSCert = flag.String("nats-tls-cert", getEnv("API_GATEWAY_NATS_TLS_CERT", ""), "NATS TLS certificate path")
+	natsTLSKey  = flag.String("nats-tls-key", getEnv("API_GATEWAY_NATS_TLS_KEY", ""), "NATS TLS key path")
+	natsTLSCA   = flag.String("nats-tls-ca", getEnv("API_GATEWAY_NATS_TLS_CA", ""), "NATS TLS CA certificate path")
 	siteID      = flag.Int("site-id", 0, "Site ID to reinject (0 = all sites)")
 	filePattern = flag.String("file", "", "File or directory pattern for file source (e.g., /var/log/api-gateway/dlq/*/site_*.jsonl)")
 	dryRun      = flag.Bool("dry-run", false, "Dry run: show messages without reinjecting")
@@ -98,7 +144,7 @@ func main() {
 	}
 
 	// Connect to NATS
-	nc, err := nats.Connect(*natsURL)
+	nc, err := connectToNATS()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to NATS: %v\n", err)
 		os.Exit(1)
@@ -145,21 +191,84 @@ func main() {
 	}
 }
 
-func loadFromRedis() ([]DLQMessage, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     *redisAddr,
-		Password: *redisPass,
-		DB:       *redisDB,
+func connectToNATS() (*nats.Conn, error) {
+	var opts []nats.Option
+
+	// NKey authentication
+	if *natsNKey != "" {
+		if _, err := os.Stat(*natsNKey); err == nil {
+			opt, err := nats.NkeyOptionFromSeed(*natsNKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create NKey option: %w", err)
+			}
+			opts = append(opts, opt)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: NKey file not found: %s. Skipping NKey authentication.\n", *natsNKey)
+		}
+	}
+
+	// TLS configuration
+	if *natsTLSCert != "" && *natsTLSKey != "" {
+		_, certErr := os.Stat(*natsTLSCert)
+		_, keyErr := os.Stat(*natsTLSKey)
+		if certErr == nil && keyErr == nil {
+			opts = append(opts, nats.ClientCert(*natsTLSCert, *natsTLSKey))
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: TLS certificate or key file not found. Skipping TLS authentication.\n")
+		}
+	}
+	if *natsTLSCA != "" {
+		if _, err := os.Stat(*natsTLSCA); err == nil {
+			opts = append(opts, nats.RootCAs(*natsTLSCA))
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: TLS CA file not found: %s. Using system CA certificates.\n", *natsTLSCA)
+		}
+	}
+
+	// Connect to NATS server
+	return nats.Connect(*natsURL, opts...)
+}
+
+func createRedisClient() (*redis.Client, error) {
+	// Parse sentinel address format
+	host, port, masterName, err := extractSentinelInfo(*redisAddr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sentinel address format: %w", err)
+	}
+
+	sentinelAddr := fmt.Sprintf("%s:%s", host, port)
+
+	// Create Redis Failover Client
+	client := redis.NewFailoverClient(&redis.FailoverOptions{
+		MasterName:       masterName,
+		Password:         *redisPass,
+		SentinelPassword: *redisPass,
+		SentinelAddrs:    []string{sentinelAddr},
+		DB:               *redisDB,
+		DialTimeout:      5 * time.Second,
+		ReadTimeout:      5 * time.Second,
+		WriteTimeout:     5 * time.Second,
 	})
+
+	// Test connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := client.Ping(ctx).Result(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis Sentinel at %s / %s: %w", sentinelAddr, masterName, err)
+	}
+
+	return client, nil
+}
+
+func loadFromRedis() ([]DLQMessage, error) {
+	client, err := createRedisClient()
+	if err != nil {
+		return nil, err
+	}
 	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// Test connection
-	if _, err := client.Ping(ctx).Result(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
-	}
 
 	var messages []DLQMessage
 
@@ -313,11 +422,10 @@ func loadFromFile(filename string) ([]DLQMessage, error) {
 }
 
 func deleteFromRedis() error {
-	client := redis.NewClient(&redis.Options{
-		Addr:     *redisAddr,
-		Password: *redisPass,
-		DB:       *redisDB,
-	})
+	client, err := createRedisClient()
+	if err != nil {
+		return err
+	}
 	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
