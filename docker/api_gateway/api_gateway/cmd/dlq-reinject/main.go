@@ -158,6 +158,7 @@ func main() {
 	// Reinject messages
 	reinjected := 0
 	failed := 0
+	reinjectedMessages := make([]DLQMessage, 0)
 
 	for i, msg := range messages {
 		if *limit > 0 && reinjected >= *limit {
@@ -192,6 +193,7 @@ func main() {
 		}
 
 		reinjected++
+		reinjectedMessages = append(reinjectedMessages, msg)
 		if *verbose {
 			fmt.Printf("[%d/%d] Reinjected: Site %d, Doc %d\n",
 				reinjected, len(messages), msg.SiteID, msg.DocID)
@@ -201,11 +203,11 @@ func main() {
 	fmt.Printf("\nReinjection complete: %d succeeded, %d failed\n", reinjected, failed)
 
 	// Delete from Redis if requested
-	if *deleteAfter && *source == "redis" && reinjected > 0 {
-		if err := deleteFromRedis(); err != nil {
+	if *deleteAfter && *source == "redis" && len(reinjectedMessages) > 0 {
+		if err := deleteFromRedis(reinjectedMessages); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to delete messages from Redis: %v\n", err)
 		} else {
-			fmt.Printf("Deleted messages from Redis\n")
+			fmt.Printf("Deleted %d reinjected messages from Redis\n", len(reinjectedMessages))
 		}
 	}
 }
@@ -440,47 +442,100 @@ func loadFromFile(filename string) ([]DLQMessage, error) {
 	return messages, nil
 }
 
-func deleteFromRedis() error {
+func deleteFromRedis(reinjectedMessages []DLQMessage) error {
 	client, err := createRedisClient()
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if *siteID > 0 {
-		// Delete for specific site
-		dlqKey := fmt.Sprintf("%s%d", dlqKeyPrefix, *siteID)
-		counterKey := fmt.Sprintf("dlq:counter:site:%d", *siteID)
+	// Group messages by site ID
+	messagesBySite := make(map[int32][]DLQMessage)
+	for _, msg := range reinjectedMessages {
+		messagesBySite[msg.SiteID] = append(messagesBySite[msg.SiteID], msg)
+	}
 
+	// Delete messages for each site
+	for siteID, messagesToDelete := range messagesBySite {
+		dlqKey := fmt.Sprintf("%s%d", dlqKeyPrefix, siteID)
+		counterKey := fmt.Sprintf("dlq:counter:site:%d", siteID)
+
+		// Get all messages from the list
+		allMessagesJSON, err := client.LRange(ctx, dlqKey, 0, -1).Result()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to get messages from site %d: %v\n", siteID, err)
+			continue
+		}
+
+		// Parse all messages
+		var allMessages []DLQMessage
+		for _, msgJSON := range allMessagesJSON {
+			var msg DLQMessage
+			if err := json.Unmarshal([]byte(msgJSON), &msg); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to unmarshal message: %v\n", err)
+				continue
+			}
+			allMessages = append(allMessages, msg)
+		}
+
+		// Create a set of messages to delete (using timestamp as unique key)
+		deleteSet := make(map[int64]bool)
+		for _, msg := range messagesToDelete {
+			deleteSet[msg.Timestamp] = true
+		}
+
+		// Keep only messages that are NOT in the delete set
+		var remainingMessages []DLQMessage
+		for _, msg := range allMessages {
+			if !deleteSet[msg.Timestamp] {
+				remainingMessages = append(remainingMessages, msg)
+			}
+		}
+
+		deletedCount := len(allMessages) - len(remainingMessages)
+
+		// Delete the old list and create a new one with remaining messages
 		pipe := client.Pipeline()
 		pipe.Del(ctx, dlqKey)
-		pipe.Del(ctx, counterKey)
-		pipe.ZRem(ctx, "dlq:stats", fmt.Sprintf("%d", *siteID))
-
-		_, err := pipe.Exec(ctx)
-		return err
-	} else {
-		// Delete for all sites
-		siteIDs, err := client.ZRange(ctx, "dlq:stats", 0, -1).Result()
-		if err != nil && err != redis.Nil {
-			return err
+		if len(remainingMessages) > 0 {
+			// Re-add remaining messages
+			for _, msg := range remainingMessages {
+				msgJSON, err := json.Marshal(msg)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: Failed to marshal remaining message: %v\n", err)
+					continue
+				}
+				pipe.RPush(ctx, dlqKey, string(msgJSON))
+			}
 		}
 
-		for _, siteIDStr := range siteIDs {
-			sid, _ := strconv.ParseInt(siteIDStr, 10, 32)
-			dlqKey := fmt.Sprintf("%s%d", dlqKeyPrefix, sid)
-			counterKey := fmt.Sprintf("dlq:counter:site:%d", sid)
+		// Update counter
+		pipe.DecrBy(ctx, counterKey, int64(deletedCount))
 
+		// Execute pipeline
+		if _, err := pipe.Exec(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to update Redis for site %d: %v\n", siteID, err)
+			continue
+		}
+
+		// Clean up empty lists and update stats
+		if len(remainingMessages) == 0 {
+			// Remove empty keys and stats entry
 			pipe := client.Pipeline()
-			pipe.Del(ctx, dlqKey)
 			pipe.Del(ctx, counterKey)
+			pipe.ZRem(ctx, "dlq:stats", fmt.Sprintf("%d", siteID))
 			_, _ = pipe.Exec(ctx)
+		} else {
+			// Update stats with new count
+			client.ZAdd(ctx, "dlq:stats", &redis.Z{
+				Score:  float64(len(remainingMessages)),
+				Member: fmt.Sprintf("%d", siteID),
+			})
 		}
-
-		// Clear stats
-		return client.Del(ctx, "dlq:stats").Err()
 	}
+
+	return nil
 }

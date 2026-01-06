@@ -12,7 +12,12 @@ Environment Variables:
     MODEL_ZMQ_CLIENT_ADDR (str): ZeroMQ client socket address
     MODEL_ZMQ_WORKER_ADDR (str): ZeroMQ worker socket address
     MODEL_HTTP_PORT (int): HTTP server port number
-    MODEL_NUM_WORKERS (int): Number of worker processes for model inference
+    MODEL_NUM_WORKERS: Number of inference worker processes (default: CPU count / 2)
+    MODEL_BATCH_SIZE: Default batch size for model inference (default: 16)
+    MODEL_CHUNK_SIZE: Default maximum characters per text chunk (default: 1000)
+    MODEL_CHUNK_OVERLAP: Default character overlap between chunks (default: 200)
+    MODEL_LANGUAGES (List[str]): Supported languages for text processing
+    MODEL_LANGUAGE_DETECTION_PATH (str): Path to language detection model file
 
 Example:
     >>> import os
@@ -51,6 +56,7 @@ MODEL_ZMQ_CLIENT_ADDR: str = os.getenv("MODEL_ZMQ_CLIENT_ADDR", "ipc:///tmp/snow
 MODEL_ZMQ_WORKER_ADDR: str = os.getenv("MODEL_ZMQ_WORKER_ADDR", "ipc:///tmp/snowflake-arctic.worker")
 MODEL_HTTP_PORT: int = int(os.getenv("MODEL_HTTP_PORT", 8000))
 MODEL_NUM_WORKERS: int = max(1, int(os.getenv("MODEL_NUM_WORKERS", cpu_count() // 2)))
+MODEL_BATCH_SIZE: int = int(os.getenv("MODEL_BATCH_SIZE", 16))
 MODEL_CHUNK_SIZE: int = int(os.getenv("MODEL_CHUNK_SIZE", 1000))
 MODEL_CHUNK_OVERLAP: int = int(os.getenv("MODEL_CHUNK_OVERLAP", 200))
 MODEL_LANGUAGES: List[str] = list(

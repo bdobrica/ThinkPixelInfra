@@ -300,9 +300,59 @@ else
 fi
 
 # ============================================================
-# Step 7: Perform actual reinjection
+# Step 7: Test partial reinjection with --limit and --delete
 # ============================================================
-test_step "Step 7: Performing actual message reinjection"
+test_step "Step 7: Testing partial reinjection (--limit 1 --delete)"
+
+# Get count before partial reinjection
+DLQ_BEFORE=$(curl -s -X GET "$API_URL/dlq/messages?site_id=${SITE_ID}" \
+    -H "Authorization: Bearer ${JWT_TOKEN}" \
+    2>/dev/null)
+COUNT_BEFORE=$(echo "$DLQ_BEFORE" | jq '. | length' 2>/dev/null || echo "0")
+
+echo "Messages in DLQ before partial reinjection: $COUNT_BEFORE"
+
+# Reinject only 1 message with --delete
+PARTIAL_REINJECT_OUTPUT=$(docker exec api-gateway /app/dlq-reinject \
+    --site-id ${SITE_ID} \
+    --limit 1 \
+    --delete \
+    -v \
+    2>&1)
+
+echo "$PARTIAL_REINJECT_OUTPUT"
+
+if echo "$PARTIAL_REINJECT_OUTPUT" | grep -q "Reinjection complete"; then
+    PARTIAL_REINJECTED=$(echo "$PARTIAL_REINJECT_OUTPUT" | grep "Reinjection complete" | sed -n 's/.*\([0-9]\+\) succeeded.*/\1/p')
+    if [ "$PARTIAL_REINJECTED" = "1" ]; then
+        pass_test "Successfully reinjected 1 message with --limit 1"
+    else
+        fail_test "Expected 1 message reinjected but got $PARTIAL_REINJECTED"
+    fi
+else
+    fail_test "Partial reinjection failed"
+fi
+
+# Verify only 1 message was deleted
+sleep 2
+DLQ_AFTER=$(curl -s -X GET "$API_URL/dlq/messages?site_id=${SITE_ID}" \
+    -H "Authorization: Bearer ${JWT_TOKEN}" \
+    2>/dev/null)
+COUNT_AFTER=$(echo "$DLQ_AFTER" | jq '.count // 0' 2>/dev/null || echo "0")
+
+echo "Messages in DLQ after partial reinjection: $COUNT_AFTER"
+
+EXPECTED_REMAINING=$((COUNT_BEFORE - 1))
+if [ "$COUNT_AFTER" = "$EXPECTED_REMAINING" ]; then
+    pass_test "Only 1 message was deleted from DLQ (${COUNT_AFTER} remaining)"
+else
+    fail_test "Expected $EXPECTED_REMAINING messages remaining but found $COUNT_AFTER"
+fi
+
+# ============================================================
+# Step 8: Perform full reinjection of remaining messages
+# ============================================================
+test_step "Step 8: Performing full reinjection of remaining messages"
 
 REINJECT_OUTPUT=$(docker exec api-gateway /app/dlq-reinject \
     --site-id ${SITE_ID} \
@@ -315,7 +365,7 @@ echo "$REINJECT_OUTPUT"
 if echo "$REINJECT_OUTPUT" | grep -q "Reinjection complete"; then
     REINJECTED=$(echo "$REINJECT_OUTPUT" | grep "Reinjection complete" | sed -n 's/.*\([0-9]\+\) succeeded.*/\1/p')
     if [ "$REINJECTED" -gt 0 ]; then
-        pass_test "Successfully reinjected $REINJECTED messages"
+        pass_test "Successfully reinjected remaining $REINJECTED messages"
     else
         fail_test "Reinjection completed but 0 messages reinjected"
     fi
@@ -324,9 +374,9 @@ else
 fi
 
 # ============================================================
-# Step 8: Wait and verify messages were processed
+# Step 9: Wait and verify messages were processed
 # ============================================================
-test_step "Step 8: Waiting for reinjected messages to be processed"
+test_step "Step 9: Waiting for reinjected messages to be processed"
 
 echo "Waiting 20 seconds for message processing..."
 sleep 20
@@ -346,9 +396,9 @@ else
 fi
 
 # ============================================================
-# Step 9: Verify embeddings were stored
+# Step 10: Verify embeddings were stored
 # ============================================================
-test_step "Step 9: Verifying embeddings were stored in Qdrant"
+test_step "Step 10: Verifying embeddings were stored in Qdrant"
 
 # First check if collection exists and has points
 COLLECTION_NAME="site_${SITE_ID}"
