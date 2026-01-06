@@ -2,6 +2,7 @@ package dlq
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -63,7 +64,8 @@ type DLQMessage struct {
 	Subject      string `json:"subject"`
 	ErrorMessage string `json:"error_message"`
 	RetryCount   int32  `json:"retry_count"`
-	PayloadJSON  string `json:"payload_json"`
+	PayloadJSON  string `json:"payload_json"`  // Human-readable JSON for debugging
+	PayloadProto string `json:"payload_proto"` // Base64-encoded protobuf for reinjection
 }
 
 // extractSentinelInfo extracts host, port and master name from sentinel address string
@@ -149,7 +151,9 @@ func InitializeDLQ() error {
 }
 
 // StoreDLQMessage stores a failed message in Redis with TTL
-func StoreDLQMessage(siteID int32, docID int32, subject string, errorMsg string, payloadJSON string, retryCount int32) error {
+// payloadJSON: human-readable JSON for debugging
+// payloadProto: original protobuf bytes (base64-encoded) for reinjection
+func StoreDLQMessage(siteID int32, docID int32, subject string, errorMsg string, payloadJSON string, payloadProto []byte, retryCount int32) error {
 	if dlqRedisClient == nil {
 		return fmt.Errorf("DLQ Redis client not initialized")
 	}
@@ -166,6 +170,7 @@ func StoreDLQMessage(siteID int32, docID int32, subject string, errorMsg string,
 		ErrorMessage: errorMsg,
 		RetryCount:   retryCount,
 		PayloadJSON:  payloadJSON,
+		PayloadProto: base64.StdEncoding.EncodeToString(payloadProto), // Store as base64-encoded string
 	}
 
 	// Serialize to JSON

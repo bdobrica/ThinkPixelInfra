@@ -160,6 +160,10 @@ test-graceful-shutdown: ## Test graceful shutdown
 	@echo "$(GREEN)Testing graceful shutdown...$(NC)"
 	@cd tests && bash test-graceful-shutdown.sh
 
+test-dlq-reinject: ## Test DLQ reinjection functionality
+	@echo "$(GREEN)Testing DLQ reinjection...$(NC)"
+	@bash tests/test-dlq-reinject.sh
+
 test-integration: ## Run integration tests
 	@echo "$(GREEN)Running integration tests...$(NC)"
 	@bash tests/test-integration.sh
