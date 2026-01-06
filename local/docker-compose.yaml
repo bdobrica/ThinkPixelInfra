@@ -91,6 +91,11 @@ services:
       - LOCAL=1
       - API_GATEWAY_ENABLE_INSECURE_VALIDATION=1
       - API_GATEWAY_VALIDATION_MAX_ATTEMPTS=10
+      - API_GATEWAY_DLQ_REDIS_ADDR=redis-sentinel:26379/mymaster
+      - API_GATEWAY_DLQ_REDIS_PASSWORD=
+      - API_GATEWAY_DLQ_REDIS_DB=0
+      - API_GATEWAY_NATS_URL=nats://nats:4222
+      - API_GATEWAY_DOCUMENT_QUEUE_SUBJECT=store.jobs
     ports:
       - "8080:8080"
     depends_on:

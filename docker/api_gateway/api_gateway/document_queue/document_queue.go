@@ -213,7 +213,7 @@ func NewDocumentQueuePayload(siteID, id int32, text string, extra map[string]str
 
 // SubscribeWithDLQ subscribes to both the main subject and its dead letter queue
 // Returns subscriptions for both main and DLQ subjects
-func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePayload) error, dlqHandler func(payload *DocumentQueuePayload, subject string) error) (*nats.Subscription, *nats.Subscription, error) {
+func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePayload) error, dlqHandler func(payload *DocumentQueuePayload, subject string, protoData []byte) error) (*nats.Subscription, *nats.Subscription, error) {
 	if dq.natsConn == nil {
 		return nil, nil, fmt.Errorf("NATS connection not initialized")
 	}
@@ -251,7 +251,7 @@ func (dq *DocumentQueue) SubscribeWithDLQ(handler func(payload *DocumentQueuePay
 		}
 
 		if dlqHandler != nil {
-			if err := dlqHandler(payload, dlqSubject); err != nil {
+			if err := dlqHandler(payload, dlqSubject, msg.Data); err != nil {
 				logger.Errorf("DLQ handler failed for message: %v", err)
 			}
 		} else {

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,7 +25,8 @@ type DLQMessage struct {
 	Subject      string `json:"subject"`
 	ErrorMessage string `json:"error_message"`
 	RetryCount   int32  `json:"retry_count"`
-	PayloadJSON  string `json:"payload_json"`
+	PayloadJSON  string `json:"payload_json"`  // Human-readable JSON for debugging
+	PayloadProto string `json:"payload_proto"` // Base64-encoded protobuf for reinjection
 }
 
 const (
@@ -79,12 +81,12 @@ var (
 	redisAddr   = flag.String("redis", getEnv("API_GATEWAY_DLQ_REDIS_ADDR", "localhost:26379/mymaster"), "Redis Sentinel address (format: host:port/master)")
 	redisPass   = flag.String("redis-pass", getEnv("API_GATEWAY_DLQ_REDIS_PASSWORD", ""), "Redis password")
 	redisDB     = flag.Int("redis-db", getEnvInt("API_GATEWAY_DLQ_REDIS_DB", 1), "Redis database number")
-	natsURL     = flag.String("nats", getEnv("API_GATEWAY_NATS_URL", "nats://localhost:4222"), "NATS URL")
+	natsURL     = flag.String("nats", getEnv("API_GATEWAY_NATS_URL", "nats://nats:4222"), "NATS URL")
 	natsSubject = flag.String("subject", getEnv("API_GATEWAY_DOCUMENT_QUEUE_SUBJECT", "store.jobs"), "NATS subject to publish to")
-	natsNKey    = flag.String("nats-nkey", getEnv("API_GATEWAY_NATS_NKEY_PATH", ""), "NATS NKey file path")
-	natsTLSCert = flag.String("nats-tls-cert", getEnv("API_GATEWAY_NATS_TLS_CERT", ""), "NATS TLS certificate path")
-	natsTLSKey  = flag.String("nats-tls-key", getEnv("API_GATEWAY_NATS_TLS_KEY", ""), "NATS TLS key path")
-	natsTLSCA   = flag.String("nats-tls-ca", getEnv("API_GATEWAY_NATS_TLS_CA", ""), "NATS TLS CA certificate path")
+	natsNKey    = flag.String("nats-nkey", getEnv("API_GATEWAY_NATS_NKEY_PATH", "/etc/nats/nkeys/nats.nk"), "NATS NKey file path")
+	natsTLSCert = flag.String("nats-tls-cert", getEnv("API_GATEWAY_NATS_TLS_CERT", "/etc/nats/tls/tls.crt"), "NATS TLS certificate path")
+	natsTLSKey  = flag.String("nats-tls-key", getEnv("API_GATEWAY_NATS_TLS_KEY", "/etc/nats/tls/tls.key"), "NATS TLS key path")
+	natsTLSCA   = flag.String("nats-tls-ca", getEnv("API_GATEWAY_NATS_TLS_CA", "/etc/nats/tls/ca.crt"), "NATS TLS CA certificate path")
 	siteID      = flag.Int("site-id", 0, "Site ID to reinject (0 = all sites)")
 	filePattern = flag.String("file", "", "File or directory pattern for file source (e.g., /var/log/api-gateway/dlq/*/site_*.jsonl)")
 	dryRun      = flag.Bool("dry-run", false, "Dry run: show messages without reinjecting")
@@ -163,8 +165,25 @@ func main() {
 			break
 		}
 
-		// Republish to NATS
-		err := nc.Publish(*natsSubject, []byte(msg.PayloadJSON))
+		// Check if we have protobuf data
+		if msg.PayloadProto == "" {
+			fmt.Fprintf(os.Stderr, "Warning: Message %d (site %d, doc %d) has no protobuf data, skipping\n",
+				i+1, msg.SiteID, msg.DocID)
+			failed++
+			continue
+		}
+
+		// Decode base64 protobuf data
+		protoBytes, err := base64.StdEncoding.DecodeString(msg.PayloadProto)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to decode protobuf for message %d (site %d, doc %d): %v\n",
+				i+1, msg.SiteID, msg.DocID, err)
+			failed++
+			continue
+		}
+
+		// Republish to NATS using decoded protobuf bytes
+		err = nc.Publish(*natsSubject, protoBytes)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to publish message %d (site %d, doc %d): %v\n",
 				i+1, msg.SiteID, msg.DocID, err)

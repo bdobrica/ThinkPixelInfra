@@ -29,7 +29,7 @@ type SubscriptionManager struct {
 
 // deadLetterHandler processes messages that have exceeded their retry limit
 // This stores the failed message in Redis with TTL for ephemeral storage
-func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
+func deadLetterHandler(payload *DocumentQueuePayload, subject string, protoData []byte) error {
 	logger.Errorf("Dead letter message received for site %d, document ID %d after %d retries. Last error: %s",
 		payload.SiteId, payload.Id, payload.RetryCount, payload.ErrorMessage)
 
@@ -40,13 +40,14 @@ func deadLetterHandler(payload *DocumentQueuePayload, subject string) error {
 		payloadJSON = "{}" // Use empty JSON if marshaling fails
 	}
 
-	// Store in Redis DLQ with TTL
+	// Store in Redis DLQ with TTL (both JSON and protobuf)
 	err = dlq.StoreDLQMessage(
 		payload.SiteId,
 		payload.Id,
 		subject,
 		payload.ErrorMessage,
 		payloadJSON,
+		protoData, // Store original protobuf bytes for reinjection
 		payload.RetryCount,
 	)
 	if err != nil {
