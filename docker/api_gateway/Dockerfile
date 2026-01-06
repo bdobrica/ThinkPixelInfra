@@ -19,11 +19,14 @@ COPY api_gateway/. ./
 # Build the Go application as a static binary
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o api_gateway main.go
 
+# Build the dlq-reinject tool
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o dlq-reinject ./cmd/dlq-reinject/main.go
+
 # Stage 2: Create the runtime image
 FROM alpine:3.21
 
 # Set the version of the application
-ENV VERSION="0.6.3"
+ENV VERSION="0.6.4"
 
 # Install any runtime dependencies (e.g., certificates)
 RUN apk --no-cache add ca-certificates
@@ -33,6 +36,9 @@ WORKDIR /app
 
 # Copy the compiled binary from the build stage
 COPY --from=build /app/api_gateway .
+
+# Copy the dlq-reinject tool from the build stage
+COPY --from=build /app/dlq-reinject .
 
 # Expose the port your app will run on
 EXPOSE 8080
