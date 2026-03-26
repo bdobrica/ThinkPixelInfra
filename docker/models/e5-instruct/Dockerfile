@@ -11,19 +11,21 @@ FROM python:3.10.20-slim-trixie as fasttext-builder
 
 ARG TARGETPLATFORM
 WORKDIR /opt
-RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
-    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM} \
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM},sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM},sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential
+    build-essential \
+    ca-certificates
 RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
     pip wheel --no-cache-dir --wheel-dir /tmp/wheels fasttext
 
 FROM python:3.10.20-slim-trixie
 
 ARG TARGETPLATFORM
-RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
-    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM} \
-    apt-get update
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM},sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM},sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates
 RUN mkdir /app
 WORKDIR /app
 
@@ -46,6 +48,6 @@ COPY --from=weights /opt/weights/e5-instruct/multilingual-e5-large-instruct /app
 COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY e5_instruct e5_instruct
 
-ENV VERSION="0.1.2"
+ENV VERSION="0.1.3"
 
 CMD ["python", "-m", "e5_instruct"]
