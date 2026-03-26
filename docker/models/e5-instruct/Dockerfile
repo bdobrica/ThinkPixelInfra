@@ -1,4 +1,4 @@
-FROM alpine:3.21 AS weights
+FROM alpine:3.23.3 AS weights
 
 RUN apk --no-cache add ca-certificates curl
 
@@ -7,7 +7,7 @@ COPY weights.sh weights.sh
 RUN chmod +x weights.sh
 RUN /opt/weights.sh
 
-FROM python:3.10-slim-bookworm
+FROM python:3.10.20-slim-trixie
 
 ARG TARGETPLATFORM
 RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
@@ -29,6 +29,6 @@ COPY --from=weights /opt/weights/e5-instruct/multilingual-e5-large-instruct /app
 COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY e5_instruct e5_instruct
 
-ENV VERSION="0.1.0"
+ENV VERSION="0.1.1"
 
 CMD ["python", "-m", "e5_instruct"]
