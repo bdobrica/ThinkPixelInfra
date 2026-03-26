@@ -7,6 +7,17 @@ COPY weights.sh weights.sh
 RUN chmod +x weights.sh
 RUN /opt/weights.sh
 
+FROM python:3.10.20-slim-trixie as fasttext-builder
+
+ARG TARGETPLATFORM
+WORKDIR /opt
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM} \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    pip wheel --no-cache-dir --wheel-dir /tmp/wheels fasttext
+
 FROM python:3.10.20-slim-trixie
 
 ARG TARGETPLATFORM
@@ -15,6 +26,12 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
     apt-get update
 RUN mkdir /app
 WORKDIR /app
+
+COPY --from=fasttext-builder /tmp/wheels /tmp/wheels
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    pip install --no-cache-dir /tmp/wheels/fasttext-*.whl \
+    && rm -rf /tmp/wheels
+
 COPY requirements.txt requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
     pip install -r requirements.txt
@@ -29,6 +46,6 @@ COPY --from=weights /opt/weights/e5-instruct/multilingual-e5-large-instruct /app
 COPY --from=weights /opt/weights/fasttext /app/fasttext
 COPY e5_instruct e5_instruct
 
-ENV VERSION="0.1.1"
+ENV VERSION="0.1.2"
 
 CMD ["python", "-m", "e5_instruct"]
