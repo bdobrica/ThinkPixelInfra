@@ -7,7 +7,7 @@ COPY weights.sh weights.sh
 RUN chmod +x weights.sh
 RUN /opt/weights.sh
 
-FROM python:3.10.20-slim-trixie as fasttext-builder
+FROM python:3.10.20-slim-trixie AS fasttext-builder
 
 ARG TARGETPLATFORM
 WORKDIR /opt
