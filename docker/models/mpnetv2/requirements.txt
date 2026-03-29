@@ -1,6 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 fastapi[standard]
-fasttext-predict
 protobuf
 pyyaml
 pyzmq
