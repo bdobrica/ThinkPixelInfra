@@ -67,7 +67,7 @@ class EmptyBatchError(Exception):
 # Load model and tokenizer globally (to save memory per worker)
 @lru_cache(maxsize=None)
 def load_model():
-    global tokenizer, session, search_prefix_length
+    global tokenizer, session
 
     logger.info("Loading model from %s...", MODEL_PATH)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, use_fast=True)
@@ -89,7 +89,7 @@ def load_model():
 
 def _process_task(context: zmq.Context):
     """Worker process for running inference."""
-    global tokenizer, session, search_prefix_length
+    global tokenizer, session
 
     load_model()
 
@@ -159,7 +159,7 @@ def _process_task(context: zmq.Context):
                     },
                 )
                 batch_input = None
-                results.extend(build_results(batch_items, batch_tokens, model_output))
+                results.extend(build_results(batch_items, batch_tokens, model_output))  # type: ignore
                 batch_items = None
                 batch_tokens = None
                 model_output = None
