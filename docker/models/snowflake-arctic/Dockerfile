@@ -1,4 +1,4 @@
-FROM alpine:3.21 AS weights
+FROM alpine:3.23.3 AS weights
 
 RUN apk --no-cache add ca-certificates curl
 
@@ -7,14 +7,33 @@ COPY weights.sh weights.sh
 RUN chmod +x weights.sh
 RUN /opt/weights.sh
 
-FROM python:3.10-slim-bookworm
+FROM python:3.10.20-slim-trixie AS fasttext-builder
 
 ARG TARGETPLATFORM
-RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM} \
-    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM} \
-    apt-get update
+WORKDIR /opt
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM},sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM},sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    pip wheel --no-cache-dir --wheel-dir /tmp/wheels fasttext
+
+FROM python:3.10.20-slim-trixie
+
+ARG TARGETPLATFORM
+RUN --mount=type=cache,target=/var/cache/apt,id=apt-cache-${TARGETPLATFORM},sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,id=apt-lib-${TARGETPLATFORM},sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates
 RUN mkdir /app
 WORKDIR /app
+
+COPY --from=fasttext-builder /tmp/wheels /tmp/wheels
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
+    pip install --no-cache-dir /tmp/wheels/fasttext-*.whl \
+    && rm -rf /tmp/wheels
+
 COPY requirements.txt requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip,id=pip-cache-${TARGETPLATFORM} \
     pip install -r requirements.txt
