@@ -53,6 +53,7 @@ from .config import (
 )
 from .postprocess import build_results
 from .preprocess import prepare_text_items
+from .search import compute_search_prefix_length
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -101,7 +102,12 @@ def load_model():
 
     logger.info("Loading model from %s...", MODEL_PATH)
     device = torch.device(MODEL_DEVICE)
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, use_fast=True)
+
+    # Precompute search prefix lengths for all supported languages to remove them from token lists during postprocessing
+    # Added 1 to the length of the prefix to account for missing start token in the tokenized output.
+    compute_search_prefix_length(lambda prefix: 1 + len(tokenizer([prefix], add_special_tokens=False).input_ids[0]))
+
     model = AutoModel.from_pretrained(MODEL_PATH).to(device)
 
 
