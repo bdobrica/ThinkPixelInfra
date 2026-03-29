@@ -41,9 +41,7 @@ class ExportReadyModel(PreTrainedModel):
             )
         if hasattr(_output, "attentions"):
             output["attentions"] = torch.mean(
-                _output.attentions[-1][
-                    :, :, 0, :
-                ],  # (batch, num_heads, seq_len)
+                _output.attentions[-1][:, :, 0, :],  # (batch, num_heads, seq_len)
                 dim=1,
             )  # (batch, seq_len)
         return output

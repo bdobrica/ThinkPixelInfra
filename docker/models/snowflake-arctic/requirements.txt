@@ -1,5 +1,4 @@
 fastapi[standard]
-fasttext-predict
 mmh3
 onnxruntime[cpu]
 pyyaml

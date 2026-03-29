@@ -51,6 +51,7 @@ from .config import (
 )
 from .postprocess import build_results
 from .preprocess import prepare_text_items
+from .search import compute_search_prefix_length
 
 # Setup logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -69,7 +70,12 @@ def load_model():
     global tokenizer, session
 
     logger.info("Loading model from %s...", MODEL_PATH)
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, use_fast=True)
+
+    # Precompute search prefix lengths for all supported languages to remove them from token lists during postprocessing
+    # Added 1 to the length of the prefix to account for missing start token in the tokenized output.
+    compute_search_prefix_length(lambda prefix: 1 + len(tokenizer([prefix], add_special_tokens=False).input_ids[0]))
+
     providers = {
         "cpu": "CPUExecutionProvider",
         "gpu": "CUDAExecutionProvider",
@@ -135,7 +141,13 @@ def _process_task(context: zmq.Context):
                     len(batch_text),
                     sum(len(text.encode("utf-8")) for text in batch_text),
                 )
-                batch_input = tokenizer(batch_text, padding=True, truncation=True, return_tensors="np")
+                batch_input = tokenizer(
+                    batch_text,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="np",
+                    max_length=8192,
+                )
                 batch_tokens = map(tokenizer.convert_ids_to_tokens, batch_input.input_ids)
                 model_output = session.run(
                     None,
@@ -145,7 +157,7 @@ def _process_task(context: zmq.Context):
                     },
                 )
                 batch_input = None
-                results.extend(build_results(batch_items, batch_tokens, model_output))
+                results.extend(build_results(batch_items, batch_tokens, model_output))  # type: ignore
                 batch_items = None
                 batch_tokens = None
                 model_output = None
