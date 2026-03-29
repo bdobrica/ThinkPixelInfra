@@ -75,11 +75,13 @@ def prepare_text_items(
     Args:
         text_items (list): List of dictionaries containing text and metadata.
                           Each item should have 'text' and optional 'metadata' keys.
+        language (str, optional): Language code for the text (e.g., 'en', 'fr').
+                                  If 'auto', the language will be detected automatically.
+        mode (str, optional): Processing mode for embeddings (e.g., 'store', 'search').
+                              Defaults to 'store'.
         chunk_size (int, optional): Maximum characters per chunk. Defaults to 1000.
         chunk_overlap (int, optional): Maximum characters to overlap between chunks.
                                      Defaults to 200.
-        language (str, optional): Language code for the text (e.g., 'en', 'fr').
-                                  If 'auto', the language will be detected automatically.
 
     Returns:
         list: List of processed text items with chunks. Each item contains:

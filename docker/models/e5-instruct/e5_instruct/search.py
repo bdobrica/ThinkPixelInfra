@@ -1,5 +1,7 @@
 from typing import Callable
 
+from .config import SPACY_LANGUAGE_MODELS
+
 _INSTRUCTIONS = {
     "en": "Given a web search query, retrieve relevant passages that answer the query",
     "fr": "Étant donné une requête de recherche web, récupérez les passages pertinents qui répondent à la requête",
@@ -31,7 +33,7 @@ def compute_search_prefix_length(callback: Callable[[str], int]) -> None:
 
     if not _SEARCH_PREFIX_LENGTH:
         _SEARCH_PREFIX_LENGTH.update(
-            {language: callback(get_search_prefix(language)) for language in _INSTRUCTIONS.keys()}
+            {language: callback(get_search_prefix(language)) for language in ["auto", *SPACY_LANGUAGE_MODELS.keys()]}
         )
 
 
