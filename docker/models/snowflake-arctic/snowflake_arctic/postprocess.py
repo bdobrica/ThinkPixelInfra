@@ -89,7 +89,9 @@ def _reduce_tokens(res: List[WeightedToken], y: Tuple[str, np.ndarray]) -> List[
 
 
 def build_results(
-    text_items: List[dict], batch_tokens: Iterable[List[str]], model_output: Tuple[np.ndarray, np.ndarray]
+    text_items: List[dict],
+    batch_tokens: Iterable[List[str]],
+    model_output: Tuple[np.ndarray, np.ndarray],
 ) -> List[dict]:
     """
     Build final embedding results from model outputs and text items.
@@ -140,11 +142,19 @@ def build_results(
         extra: dict = metadata.get("extra", {})
         offset: int = extra.pop("offset", 0)
         language_model = extra.pop("language_model", None)
+        remove_prefix_length: int = extra.pop("remove_prefix_length", 0)
 
         if not isinstance(language_model, LanguageModel):
             continue
 
         extra["language"] = language_model.language
+
+        # Remove prefix tokens from token list and sparse weights if in search mode to avoid including instruction
+        # tokens in the sparse vector representation.
+        if remove_prefix_length > 0:
+            tokens = tokens[remove_prefix_length:]
+            sparse_weights = sparse_weights[remove_prefix_length:]
+
         tokens, sparse_weights = zip(
             *reduce(
                 _reduce_tokens,
