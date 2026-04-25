@@ -39,7 +39,7 @@ import logging
 import os
 import time
 from functools import lru_cache
-from typing import Dict, List
+from typing import Dict, List, Literal
 
 import uvicorn
 import zmq
@@ -122,6 +122,7 @@ class InferenceRequest(BaseModel):
 
     text_items: List[TextItem]
     language: str = "auto"
+    mode: Literal["search", "store"] = "store"
     chunk_size: int = MODEL_CHUNK_SIZE
     chunk_overlap: int = MODEL_CHUNK_OVERLAP
 
@@ -302,9 +303,10 @@ async def infer(request: InferenceRequest) -> InferenceResponse:
     request_id = b"request-" + os.urandom(4)  # Generate unique request ID
     request_data = {
         "text_items": [item.model_dump() for item in request.text_items],
+        "language": request.language,
+        "mode": request.mode,
         "chunk_size": request.chunk_size,
         "chunk_overlap": request.chunk_overlap,
-        "language": request.language,
     }
 
     # Send request to ZMQ Dealer
