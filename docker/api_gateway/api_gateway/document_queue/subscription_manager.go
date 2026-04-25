@@ -68,6 +68,7 @@ func marshalPayloadToJSON(payload *DocumentQueuePayload) (string, error) {
 		"site_id":              payload.SiteId,
 		"id":                   payload.Id,
 		"text":                 payload.Text,
+		"language":             payload.Language,
 		"extra":                payload.Extra,
 		"retry_count":          payload.RetryCount,
 		"max_retries":          payload.MaxRetries,
@@ -103,6 +104,10 @@ func subscriberHandler(payload *DocumentQueuePayload) error {
 			Extra: payload.Extra,
 		},
 	}
+	language := "auto"
+	if payload.Language != "" {
+		language = payload.Language
+	}
 
 	// Retrieve CacheEntry from context
 	cacheEntry, err := getCachedSiteData(payload.SiteId)
@@ -114,7 +119,7 @@ func subscriberHandler(payload *DocumentQueuePayload) error {
 
 	// Call model API to get embeddings (with metrics)
 	start := time.Now()
-	response, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
+	response, err := model.GetStoreEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, language, cacheEntry.ChunkSize, cacheEntry.ChunkOverlap)
 	metrics.ModelLatency.WithLabelValues(cacheEntry.Model, "embeddings").Observe(time.Since(start).Seconds())
 
 	if err != nil {

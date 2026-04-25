@@ -88,6 +88,7 @@ type DocumentQueuePayload struct {
 	Status             MessageStatus          `protobuf:"varint,8,opt,name=status,proto3,enum=documentqueue.MessageStatus" json:"status,omitempty"`
 	ErrorMessage       string                 `protobuf:"bytes,9,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
 	LastRetryTimestamp int64                  `protobuf:"varint,10,opt,name=last_retry_timestamp,json=lastRetryTimestamp,proto3" json:"last_retry_timestamp,omitempty"`
+	Language           string                 `protobuf:"bytes,11,opt,name=language,proto3" json:"language,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -192,11 +193,18 @@ func (x *DocumentQueuePayload) GetLastRetryTimestamp() int64 {
 	return 0
 }
 
+func (x *DocumentQueuePayload) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
 var File_document_queue_proto protoreflect.FileDescriptor
 
 const file_document_queue_proto_rawDesc = "" +
 	"\n" +
-	"\x14document_queue.proto\x12\rdocumentqueue\"\xcd\x03\n" +
+	"\x14document_queue.proto\x12\rdocumentqueue\"\xe9\x03\n" +
 	"\x14DocumentQueuePayload\x12\x17\n" +
 	"\asite_id\x18\x01 \x01(\x05R\x06siteId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x05R\x02id\x12\x12\n" +
@@ -210,7 +218,8 @@ const file_document_queue_proto_rawDesc = "" +
 	"\x06status\x18\b \x01(\x0e2\x1c.documentqueue.MessageStatusR\x06status\x12#\n" +
 	"\rerror_message\x18\t \x01(\tR\ferrorMessage\x120\n" +
 	"\x14last_retry_timestamp\x18\n" +
-	" \x01(\x03R\x12lastRetryTimestamp\x1a8\n" +
+	" \x01(\x03R\x12lastRetryTimestamp\x12\x1a\n" +
+	"\blanguage\x18\v \x01(\tR\blanguage\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +

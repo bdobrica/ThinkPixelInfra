@@ -26,6 +26,7 @@ message DocumentQueuePayload {
   MessageStatus status = 8;            // NEW: Message processing status
   string error_message = 9;            // NEW: Last error message
   int64 last_retry_timestamp = 10;     // NEW: Timestamp of last retry
+  string language = 11;                // NEW: Explicit text language for embeddings
 }
 ```
 
@@ -51,6 +52,7 @@ payload := document_queue.NewDocumentQueuePayload(
     1,                          // site_id
     123,                        // document_id
     "Content to process",       // text
+    "en",                       // language (or "auto")
     map[string]string{          // metadata
         "source": "api",
         "type": "article",

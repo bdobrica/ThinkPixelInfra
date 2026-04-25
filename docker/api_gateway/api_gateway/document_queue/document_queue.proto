@@ -22,4 +22,5 @@ message DocumentQueuePayload {
   MessageStatus status = 8;
   string error_message = 9;
   int64 last_retry_timestamp = 10;
+  string language = 11;
 }
