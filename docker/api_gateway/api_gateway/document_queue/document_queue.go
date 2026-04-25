@@ -192,7 +192,7 @@ func (dq *DocumentQueue) handleRetry(originalSubject string, payload *DocumentQu
 }
 
 // NewDocumentQueuePayload creates a new DocumentQueuePayload with default retry settings
-func NewDocumentQueuePayload(siteID, id int32, text string, extra map[string]string, maxRetries int32) *DocumentQueuePayload {
+func NewDocumentQueuePayload(siteID, id int32, text, language string, extra map[string]string, maxRetries int32) *DocumentQueuePayload {
 	if maxRetries <= 0 {
 		maxRetries = int32(config.GetEnvInt("API_GATEWAY_DOCUMENT_QUEUE_MAX_RETRIES", 3))
 	}
@@ -202,6 +202,7 @@ func NewDocumentQueuePayload(siteID, id int32, text string, extra map[string]str
 		Id:                 id,
 		Text:               text,
 		Extra:              extra,
+		Language:           language,
 		TimestampMillis:    getCurrentTimestampMillis(),
 		RetryCount:         0,
 		MaxRetries:         maxRetries,

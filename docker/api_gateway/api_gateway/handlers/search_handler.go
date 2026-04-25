@@ -16,7 +16,8 @@ import (
 )
 
 type SearchRequest struct {
-	Text string `json:"text"`
+	Text     string `json:"text"`
+	Language string `json:"language,omitempty"`
 }
 
 type SearchResponse struct {
@@ -62,6 +63,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Language == "" {
+		logger.Debugf("Language not provided in request, defaulting to 'auto'")
+		req.Language = "auto"
+	}
+
 	// Prepare TextItem for model inference
 	textItem := model.TextItem{
 		Text: req.Text,
@@ -74,7 +80,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	embeddingChan := make(chan []model.EmbeddingResponse)
 	errChan := make(chan error)
 	go func() {
-		embeddings, err := model.GetEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, len(req.Text), 0)
+		embeddings, err := model.GetSearchEmbeddings([]model.TextItem{textItem}, cacheEntry.Model, req.Language, len(req.Text), 0)
 		if err != nil {
 			errChan <- err
 			return

@@ -13,9 +13,10 @@ import (
 )
 
 type StoreRequest []struct {
-	ID    int               `json:"id"`
-	Text  string            `json:"text"`
-	Extra map[string]string `json:"extra,omitempty"`
+	ID       int               `json:"id"`
+	Text     string            `json:"text"`
+	Language string            `json:"language,omitempty"`
+	Extra    map[string]string `json:"extra,omitempty"`
 }
 
 type StoreResponse struct {
@@ -74,10 +75,15 @@ func StoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	for _, item := range req {
 		// Use proper payload creation with retry logic initialization
+		language := "auto"
+		if item.Language != "" {
+			language = item.Language
+		}
 		payload := document_queue.NewDocumentQueuePayload(
 			int32(cacheEntry.ID),
 			int32(item.ID),
 			item.Text,
+			language,
 			item.Extra,
 			0, // use default max_retries from config
 		)

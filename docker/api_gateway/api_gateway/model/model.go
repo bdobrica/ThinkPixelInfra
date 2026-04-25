@@ -42,9 +42,11 @@ func truncateForLogging(o any) string {
 // callModelAPI sends a batch of TextItems to the model API and decodes the response.
 // Handles request marshalling, HTTP POST, error logging, and response decoding.
 // Returns the decoded inference response or an error.
-func callModelAPI(client *http.Client, textItems []TextItem, model string, chunkSize, chunkOverlap int) (*InferenceResponse, error) {
+func callModelAPI(client *http.Client, textItems []TextItem, model, language, mode string, chunkSize, chunkOverlap int) (*InferenceResponse, error) {
 	requestPayload := InferenceRequest{
 		TextItems:    textItems,
+		Language:     language,
+		Mode:         mode,
 		ChunkSize:    chunkSize,
 		ChunkOverlap: chunkOverlap,
 	}
@@ -81,13 +83,13 @@ func callModelAPI(client *http.Client, textItems []TextItem, model string, chunk
 
 // callModelAPIWithRetry calls the model API with retry logic and exponential backoff for recoverable errors.
 // Returns the inference response or an error after exhausting retries.
-func callModelAPIWithRetry(client *http.Client, textItems []TextItem, model string, chunkSize, chunkOverlap int) (*InferenceResponse, error) {
+func callModelAPIWithRetry(client *http.Client, textItems []TextItem, model, language, mode string, chunkSize, chunkOverlap int) (*InferenceResponse, error) {
 	// Retry logic for model API call
 	modelMaxRetries := config.GetEnvInt("API_GATEWAY_MODEL_MAX_RETRIES", 3)
 	modelRetryDelay := config.GetEnvDuration("API_GATEWAY_MODEL_RETRY_DELAY", 500*time.Millisecond)
 
 	for attempt := 0; attempt < modelMaxRetries; attempt++ {
-		inferenceResponse, err := callModelAPI(client, textItems, model, chunkSize, chunkOverlap)
+		inferenceResponse, err := callModelAPI(client, textItems, model, language, mode, chunkSize, chunkOverlap)
 		if err == nil {
 			return inferenceResponse, nil // Success
 		}
@@ -137,7 +139,7 @@ func decodeInferenceResponse(inferenceResponse InferenceResponse, embeddingsResp
 // GetEmbeddings retrieves embeddings for an array of text items using the specified model.
 // Handles HTTP client initialization, model API calls, latency logging, and response decoding.
 // Returns a slice of EmbeddingResponse or an error.
-func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
+func getEmbeddings(textItems []TextItem, model, language, mode string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
 	// Initialize HTTP client
 	client, err := initHTTPClient()
 	if err != nil {
@@ -150,7 +152,7 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 	// Process the queue and call the model API
 	embeddings := make([]EmbeddingResponse, 0)
 
-	inferenceResponse, err := callModelAPIWithRetry(client, textItems, model, chunkSize, chunkOverlap)
+	inferenceResponse, err := callModelAPIWithRetry(client, textItems, model, language, mode, chunkSize, chunkOverlap)
 	if err != nil {
 		logger.Errorf("Error calling model API: %v", err)
 		return nil, err
@@ -167,4 +169,12 @@ func GetEmbeddings(textItems []TextItem, model string, chunkSize, chunkOverlap i
 
 	logger.Debugf("Retrieved %d embeddings for model %s", len(embeddings), model)
 	return embeddings, nil
+}
+
+func GetSearchEmbeddings(textItems []TextItem, model, language string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
+	return getEmbeddings(textItems, model, language, "search", chunkSize, chunkOverlap)
+}
+
+func GetStoreEmbeddings(textItems []TextItem, model, language string, chunkSize, chunkOverlap int) ([]EmbeddingResponse, error) {
+	return getEmbeddings(textItems, model, language, "store", chunkSize, chunkOverlap)
 }

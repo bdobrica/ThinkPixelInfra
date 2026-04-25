@@ -14,6 +14,7 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 		siteID      int32
 		id          int32
 		text        string
+		language    string
 		extra       map[string]string
 		maxRetries  int32
 		wantRetries int32
@@ -23,6 +24,7 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 			siteID:      1,
 			id:          100,
 			text:        "Test document",
+			language:    "en",
 			extra:       map[string]string{"key": "value"},
 			maxRetries:  0, // Should use default from config (3)
 			wantRetries: 3,
@@ -32,6 +34,7 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 			siteID:      2,
 			id:          200,
 			text:        "Another document",
+			language:    "ro",
 			extra:       map[string]string{"url": "https://example.com"},
 			maxRetries:  5,
 			wantRetries: 5,
@@ -41,6 +44,17 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 			siteID:      3,
 			id:          300,
 			text:        "",
+			language:    "auto",
+			extra:       map[string]string{},
+			maxRetries:  3,
+			wantRetries: 3,
+		},
+		{
+			name:        "empty language is preserved",
+			siteID:      4,
+			id:          400,
+			text:        "Short query",
+			language:    "",
 			extra:       map[string]string{},
 			maxRetries:  3,
 			wantRetries: 3,
@@ -49,7 +63,7 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := NewDocumentQueuePayload(tt.siteID, tt.id, tt.text, tt.extra, tt.maxRetries)
+			payload := NewDocumentQueuePayload(tt.siteID, tt.id, tt.text, tt.language, tt.extra, tt.maxRetries)
 
 			if payload.SiteId != tt.siteID {
 				t.Errorf("SiteId = %d, want %d", payload.SiteId, tt.siteID)
@@ -59,6 +73,9 @@ func TestNewDocumentQueuePayload(t *testing.T) {
 			}
 			if payload.Text != tt.text {
 				t.Errorf("Text = %s, want %s", payload.Text, tt.text)
+			}
+			if payload.Language != tt.language {
+				t.Errorf("Language = %s, want %s", payload.Language, tt.language)
 			}
 			if len(payload.Extra) != len(tt.extra) {
 				t.Errorf("Extra length = %d, want %d", len(payload.Extra), len(tt.extra))
@@ -85,6 +102,7 @@ func TestProtobufMarshaling(t *testing.T) {
 		42,
 		1337,
 		"Test document for marshaling",
+		"es",
 		map[string]string{"url": "https://example.com/page", "title": "Test Page"},
 		5,
 	)
@@ -111,6 +129,9 @@ func TestProtobufMarshaling(t *testing.T) {
 	if unmarshaled.Text != original.Text {
 		t.Errorf("Text = %s, want %s", unmarshaled.Text, original.Text)
 	}
+	if unmarshaled.Language != original.Language {
+		t.Errorf("Language = %s, want %s", unmarshaled.Language, original.Language)
+	}
 	if len(unmarshaled.Extra) != len(original.Extra) {
 		t.Errorf("Extra map size = %d, want %d", len(unmarshaled.Extra), len(original.Extra))
 	}
@@ -135,7 +156,7 @@ func TestProtobufMarshaling(t *testing.T) {
 
 // TestMessageStatusTransitions tests status transitions
 func TestMessageStatusTransitions(t *testing.T) {
-	payload := NewDocumentQueuePayload(1, 100, "Test", map[string]string{}, 3)
+	payload := NewDocumentQueuePayload(1, 100, "Test", "auto", map[string]string{}, 3)
 
 	// Initial status should be PENDING
 	if payload.Status != MessageStatus_PENDING {
@@ -155,7 +176,7 @@ func TestMessageStatusTransitions(t *testing.T) {
 	}
 
 	// Test failure path
-	payload2 := NewDocumentQueuePayload(2, 200, "Test2", map[string]string{}, 3)
+	payload2 := NewDocumentQueuePayload(2, 200, "Test2", "fr", map[string]string{}, 3)
 	payload2.Status = MessageStatus_PROCESSING
 	payload2.Status = MessageStatus_FAILED
 	if payload2.Status != MessageStatus_FAILED {
@@ -172,7 +193,7 @@ func TestMessageStatusTransitions(t *testing.T) {
 // TestRetryLogic tests retry count and max retries behavior
 func TestRetryLogic(t *testing.T) {
 	maxRetries := int32(3)
-	payload := NewDocumentQueuePayload(1, 100, "Test", map[string]string{}, maxRetries)
+	payload := NewDocumentQueuePayload(1, 100, "Test", "auto", map[string]string{}, maxRetries)
 
 	// Initial retry count should be 0
 	if payload.RetryCount != 0 {
@@ -203,7 +224,7 @@ func TestTimestampValidation(t *testing.T) {
 	// Small sleep to ensure timestamp difference
 	time.Sleep(2 * time.Millisecond)
 
-	payload := NewDocumentQueuePayload(1, 100, "Test", map[string]string{}, 3)
+	payload := NewDocumentQueuePayload(1, 100, "Test", "de", map[string]string{}, 3)
 
 	time.Sleep(2 * time.Millisecond)
 	afterTime := time.Now().UnixMilli()
@@ -232,6 +253,7 @@ func TestLargePayload(t *testing.T) {
 		1,
 		100,
 		string(largeText),
+		"auto",
 		map[string]string{"size": "1MB"},
 		3,
 	)
@@ -256,7 +278,7 @@ func TestLargePayload(t *testing.T) {
 
 // TestErrorMessageField tests error message persistence
 func TestErrorMessageField(t *testing.T) {
-	payload := NewDocumentQueuePayload(1, 100, "Test", map[string]string{}, 3)
+	payload := NewDocumentQueuePayload(1, 100, "Test", "it", map[string]string{}, 3)
 
 	// Initially empty
 	if payload.ErrorMessage != "" {
@@ -324,7 +346,7 @@ func TestExtraMapHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			payload := NewDocumentQueuePayload(1, 100, "Test", tt.extra, 3)
+			payload := NewDocumentQueuePayload(1, 100, "Test", "auto", tt.extra, 3)
 
 			// Marshal and unmarshal
 			data, err := proto.Marshal(payload)
@@ -348,6 +370,37 @@ func TestExtraMapHandling(t *testing.T) {
 				if unmarshaled.Extra[k] != v {
 					t.Errorf("Extra[%s] = %s, want %s", k, unmarshaled.Extra[k], v)
 				}
+			}
+		})
+	}
+}
+
+func TestLanguageFieldRoundTrip(t *testing.T) {
+	tests := []struct {
+		name     string
+		language string
+	}{
+		{name: "auto language", language: "auto"},
+		{name: "explicit language", language: "en"},
+		{name: "empty language", language: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := NewDocumentQueuePayload(10, 20, "hello", tt.language, map[string]string{"source": "test"}, 2)
+
+			data, err := proto.Marshal(payload)
+			if err != nil {
+				t.Fatalf("Failed to marshal payload: %v", err)
+			}
+
+			unmarshaled := &DocumentQueuePayload{}
+			if err := proto.Unmarshal(data, unmarshaled); err != nil {
+				t.Fatalf("Failed to unmarshal payload: %v", err)
+			}
+
+			if unmarshaled.Language != tt.language {
+				t.Errorf("Language = %q, want %q", unmarshaled.Language, tt.language)
 			}
 		})
 	}
