@@ -162,6 +162,7 @@ def _process_task(context: zmq.Context):
             # Parse the request
             data = json.loads(request)
             text_items = data.get("text_items", [])
+            mode = data.get("mode", "store")
             chunk_size = data.get("chunk_size", MODEL_CHUNK_SIZE)
             chunk_overlap = data.get("chunk_overlap", MODEL_CHUNK_OVERLAP)
             language = data.get("language", "auto")
@@ -173,9 +174,10 @@ def _process_task(context: zmq.Context):
 
             text_items = prepare_text_items(
                 text_items,
+                language=language,
+                mode=mode,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
-                language=language,
             )
 
             if not text_items:
