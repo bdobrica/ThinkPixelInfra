@@ -6,12 +6,16 @@ import ipaddress
 import socket
 import time
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import httpcore
 import httpx
 from httpcore._backends.auto import AutoBackend as HttpcoreAutoBackend
 from httpx._transports.default import AsyncResponseStream, map_httpcore_exceptions
+
+SocketOptionValue = int | bytes
+SocketOption = tuple[int, int, SocketOptionValue]
+SocketOptions = Sequence[SocketOption]
 
 
 @dataclasses.dataclass
@@ -153,7 +157,7 @@ class CachingAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         port: int,
         timeout: float | None = None,
         local_address: str | None = None,
-        socket_options: Sequence[tuple[int, int, int | bytes]] | None = None,
+        socket_options: SocketOptions | None = None,
     ) -> httpcore.AsyncNetworkStream:
         ip = await self.dns_cache.resolve(host, port)
         return await self.backend.connect_tcp(
@@ -168,7 +172,7 @@ class CachingAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
         self,
         path: str,
         timeout: float | None = None,
-        socket_options: Sequence[tuple[int, int, int | bytes]] | None = None,
+        socket_options: SocketOptions | None = None,
     ) -> httpcore.AsyncNetworkStream:
         return await self.backend.connect_unix_socket(path, timeout=timeout, socket_options=socket_options)
 
@@ -195,7 +199,7 @@ class DNSCachingAsyncHTTPTransport(httpx.AsyncBaseTransport):
         limits: httpx.Limits = httpx.Limits(),
         retries: int = 0,
         local_address: str | None = None,
-        socket_options: Sequence[tuple[int, int, int | bytes]] | None = None,
+        socket_options: SocketOptions | None = None,
     ) -> None:
         self.dns_cache = dns_cache
         self.network_backend = CachingAsyncNetworkBackend(dns_cache=dns_cache)
@@ -231,10 +235,12 @@ class DNSCachingAsyncHTTPTransport(httpx.AsyncBaseTransport):
         with map_httpcore_exceptions():
             resp = await self._pool.handle_async_request(req)
 
+        response_stream = cast(httpx.AsyncByteStream, AsyncResponseStream(resp.stream))
+
         return httpx.Response(
             status_code=resp.status,
             headers=resp.headers,
-            stream=AsyncResponseStream(resp.stream),
+            stream=response_stream,
             extensions=resp.extensions,
         )
 

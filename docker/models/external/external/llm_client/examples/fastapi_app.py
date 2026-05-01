@@ -1,17 +1,18 @@
-"""Usage examples for llm_client."""
+"""Example FastAPI integration for llm_client."""
 
-EXAMPLE_FASTAPI_USAGE = r"""
 from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request
 
-from llm_client_first_pass.client import LLMClient
-from llm_client_first_pass.config import RetryConfig
-from llm_client_first_pass.integrations.fastapi import (
+from ..client import LLMClient
+from ..config import RetryConfig
+from ..integrations.fastapi import (
     DeadlineMiddleware,
     disconnect_checker_from_request,
     llm_client_from_request,
     translate_llm_exception,
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
     yield
     await app.state.llm.aclose()
 
+
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     DeadlineMiddleware,
@@ -37,6 +39,7 @@ app.add_middleware(
     overhead_ms=100,
     max_timeout_ms=120_000,
 )
+
 
 @app.post("/ask")
 async def ask(
@@ -52,4 +55,3 @@ async def ask(
     except Exception as exc:
         translate_llm_exception(exc)
         raise
-"""

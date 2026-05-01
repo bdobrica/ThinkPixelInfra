@@ -8,7 +8,7 @@ import random
 import socket
 import time
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -26,8 +26,10 @@ from .errors import (
     LLMProviderError,
 )
 from .resources import ChatCompletionsResource, EmbeddingsResource, ResponsesResource
-from .transports.dns_cache import AsyncDNSCache, DNSCachingAsyncHTTPTransport
 from .types import DisconnectChecker
+
+if TYPE_CHECKING:
+    from .transports.dns_cache import AsyncDNSCache
 
 
 class LLMClient:
@@ -78,9 +80,9 @@ class LLMClient:
 
         transport: httpx.AsyncBaseTransport | None = None
         if http_client is None and dns_ttl_seconds is not None:
-            self._dns_cache = AsyncDNSCache(ttl_seconds=dns_ttl_seconds, family=dns_family)
-            transport = DNSCachingAsyncHTTPTransport(
-                dns_cache=self._dns_cache,
+            self._dns_cache, transport = self._build_dns_transport(
+                dns_ttl_seconds=dns_ttl_seconds,
+                dns_family=dns_family,
                 limits=limits,
             )
 
@@ -389,3 +391,27 @@ class LLMClient:
     @staticmethod
     def _normalize_path(path: str) -> str:
         return path.lstrip("/")
+
+    def _build_dns_transport(
+        self,
+        *,
+        dns_ttl_seconds: float,
+        dns_family: int,
+        limits: httpx.Limits,
+    ) -> tuple["AsyncDNSCache", httpx.AsyncBaseTransport]:
+        try:
+            from .transports.dns_cache import (
+                AsyncDNSCache,
+                DNSCachingAsyncHTTPTransport,
+            )
+        except ImportError as exc:  # pragma: no cover - depends on optional transport dependencies
+            raise LLMConfigurationError(
+                "DNS caching transport is unavailable. Disable dns_ttl_seconds or install transport dependencies."
+            ) from exc
+
+        dns_cache = AsyncDNSCache(ttl_seconds=dns_ttl_seconds, family=dns_family)
+        transport = DNSCachingAsyncHTTPTransport(
+            dns_cache=dns_cache,
+            limits=limits,
+        )
+        return dns_cache, transport
