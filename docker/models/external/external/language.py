@@ -1,7 +1,5 @@
 """Language detection and NLP helpers for the external gateway."""
 
-from __future__ import annotations
-
 import logging
 import re
 import unicodedata

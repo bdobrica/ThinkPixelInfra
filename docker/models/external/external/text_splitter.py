@@ -1,7 +1,5 @@
 """Sentence-aware text chunking for the external gateway."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Iterator
 from functools import cached_property

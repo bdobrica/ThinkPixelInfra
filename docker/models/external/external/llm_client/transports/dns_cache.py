@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Optional DNS-caching transport internals for :mod:`external.llm_client`.
 
 This module wraps version-sensitive :mod:`httpx` and :mod:`httpcore` transport

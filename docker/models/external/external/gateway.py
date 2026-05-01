@@ -1,7 +1,5 @@
 """Provider-backed dense embedding gateway for the external service."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Iterable, Sequence
 

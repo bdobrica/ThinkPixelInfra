@@ -1,7 +1,5 @@
 """Text preprocessing for the external embeddings gateway."""
 
-from __future__ import annotations
-
 from .language import LanguageModel
 from .search import get_mode_prefix, get_mode_prefix_length
 from .text_splitter import TextSplitter
