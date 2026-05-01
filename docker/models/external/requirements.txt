@@ -1,0 +1,8 @@
+fastapi[standard]
+httpcore==1.0.9
+httpx==0.28.1
+mmh3
+numpy
+pyyaml
+spacy
+uvicorn
