@@ -57,9 +57,12 @@ MODEL_PROVIDER_RETRY_MAX_BACKOFF_MS: int = max(
 )
 MODEL_PROVIDER_RETRY_JITTER_RATIO: float = max(0.0, float(os.getenv("MODEL_PROVIDER_RETRY_JITTER_RATIO", 0.2)))
 
-MODEL_SPARSE_STRATEGY: str = os.getenv("MODEL_SPARSE_STRATEGY", "lexical").lower()
+MODEL_SPARSE_STRATEGY: str = os.getenv("MODEL_SPARSE_STRATEGY", "bm25").lower()
 MODEL_SPARSE_MAX_FEATURES: int = max(1, int(os.getenv("MODEL_SPARSE_MAX_FEATURES", 128)))
 MODEL_SPARSE_MIN_TOKEN_LENGTH: int = max(1, int(os.getenv("MODEL_SPARSE_MIN_TOKEN_LENGTH", 2)))
+MODEL_SPARSE_BM25_K1: float = max(0.0, float(os.getenv("MODEL_SPARSE_BM25_K1", 1.2)))
+MODEL_SPARSE_BM25_B: float = min(1.0, max(0.0, float(os.getenv("MODEL_SPARSE_BM25_B", 0.75))))
+MODEL_SPARSE_BM25_AVGDL: float = max(1.0, float(os.getenv("MODEL_SPARSE_BM25_AVGDL", 64.0)))
 
 MODEL_SEARCH_PREFIX: str = os.getenv("MODEL_SEARCH_PREFIX", "")
 MODEL_STORE_PREFIX: str = os.getenv("MODEL_STORE_PREFIX", "")

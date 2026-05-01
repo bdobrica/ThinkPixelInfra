@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import base64
 import logging
+import math
 from struct import pack
 
 import mmh3
 
-from .config import LOG_LEVEL, MODEL_SPARSE_MAX_FEATURES, MODEL_SPARSE_MIN_TOKEN_LENGTH
+from .config import (
+    LOG_LEVEL,
+    MODEL_SPARSE_BM25_AVGDL,
+    MODEL_SPARSE_BM25_B,
+    MODEL_SPARSE_BM25_K1,
+    MODEL_SPARSE_MAX_FEATURES,
+    MODEL_SPARSE_MIN_TOKEN_LENGTH,
+)
 from .language import LanguageModel
 
 logging.basicConfig(level=LOG_LEVEL)
@@ -27,29 +35,44 @@ class SparseVector:
         self.language_model = language_model
         self.max_features = max_features
 
-    def _to_weight_map(self) -> dict[str, float]:
-        weights: dict[str, float] = {}
-        first_positions: dict[str, int] = {}
+    def _extract_terms(self) -> tuple[dict[str, int], int]:
+        term_frequencies: dict[str, int] = {}
+        document_length = 0
 
-        for position, token in enumerate(self.language_model.doc):
+        for token in self.language_model.doc:
             lemma = token.lemma_.strip().lower()
             if token.is_stop or token.is_punct or not lemma or lemma == "<unk>":
                 continue
             if len(lemma) < MODEL_SPARSE_MIN_TOKEN_LENGTH:
                 continue
-            weights[lemma] = weights.get(lemma, 0.0) + 1.0
-            first_positions.setdefault(lemma, position)
+            term_frequencies[lemma] = term_frequencies.get(lemma, 0) + 1
+            document_length += 1
 
-        ranked = sorted(
-            ((lemma, count + (1.0 / (1.0 + first_positions[lemma]))) for lemma, count in weights.items()),
-            key=lambda item: (-item[1], item[0]),
-        )[: self.max_features]
+        return term_frequencies, document_length
 
-        total_weight = sum(weight for _, weight in ranked)
-        if total_weight <= 0:
+    def _bm25_weight_map(self) -> dict[str, float]:
+        term_frequencies, document_length = self._extract_terms()
+        if not term_frequencies or document_length == 0:
             return {}
 
-        return {lemma: weight / total_weight for lemma, weight in ranked}
+        normalization = MODEL_SPARSE_BM25_K1 * (
+            1.0 - MODEL_SPARSE_BM25_B + MODEL_SPARSE_BM25_B * (document_length / MODEL_SPARSE_BM25_AVGDL)
+        )
+        weights = {
+            lemma: ((frequency * (MODEL_SPARSE_BM25_K1 + 1.0)) / (frequency + normalization))
+            for lemma, frequency in term_frequencies.items()
+        }
+
+        ranked = sorted(weights.items(), key=lambda item: (-item[1], item[0]))[: self.max_features]
+
+        l2_norm = math.sqrt(sum(weight * weight for _, weight in ranked))
+        if l2_norm <= 0.0:
+            return {}
+
+        return {lemma: weight / l2_norm for lemma, weight in ranked}
+
+    def _to_weight_map(self) -> dict[str, float]:
+        return self._bm25_weight_map()
 
     def to_dict(self) -> dict[str, str]:
         return {

@@ -34,7 +34,7 @@ def build_results(
         extra.pop("remove_prefix_length", None)
         extra["language"] = language
 
-        if sparse_strategy == "lexical":
+        if sparse_strategy in {"bm25", "lexical"}:
             sparse_vector = SparseVector(LanguageModel(text=sparse_text, language=language)).to_dict()
         elif sparse_strategy == "off":
             sparse_vector = {}
