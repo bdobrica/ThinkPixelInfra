@@ -4,55 +4,54 @@ AI-powered search and retrieval-augmented generation (RAG) API Gateway with NATS
 
 ## Architecture
 
-```plaintext
-                   +--------------------+
-                   |     MySQL DB       |
-                   | (API Key Storage)  |
-                   +--------------------+
-                            |
-                            | API Key Lookup
-                            v
-+----------------------------------------------------------------+
-|                        API_GATEWAY                             |
-|         (JWT auth, API key swap, endpoint router)              |
-|   +---------------------+    +---------------------------+     |
-|   |   /search endpoint  |    |      /store endpoint      |     |
-|   +---------------------+    +---------------------------+     |
-|            |                              |                    |
-|            |                              |                    |
-|     (search request)               (store request)             |
-|            |                              |                    |
-|            v                              v                    |
-|   +--------------------+      +-------------------------+      |
-|   | SNOWFLAKE ARCTIC   |<-----|      NATS Pub/Sub       |<-+   |
-|   | (EMBEDDINGS MODEL) |      +-------------------------+  |   |
-|   +--------------------+          ^         |              |   |
-|            |      |               |         |              |   |
-|            |      +---------------+         |              |   |
-|            |  (API_GATEWAY subscribes)      |              |   |
-|            v                                |              |   |
-|   +-------------------+        Document ingest via NATS    |   |
-|   |    QDRANT DB      |<-----------------------------------+   |
-|   |  (ANN SEARCH,     |           (Chunks embeddings           |
-|   |    BM42 RERANK)   |              stored here)              |
-|   +-------------------+                                        |
-|           |                                                    |
-|           | ANN SEARCH + BM42 RERANKING                        |
-|           +--------------------------------------------------->|
-|           |                                                    |
-|  (Can swap out QDRANT with:)                                   |
-|           |                                                    |
-|   +----------------+   +--------------+   +---------------+    |
-|   | REDIS SENTINEL |<->| REDIS MASTER |<->| REDIS REPLICA |    |
-|   +----------------+   +--------------+   +---------------+    |
-|   (Just ANN SEARCH via RediSearch, drops BM42 rerank)          |
-+----------------------------------------------------------------+
+```mermaid
+flowchart TB
+    %% External systems
+    MySQL["MySQL DB<br/>(API key storage)"]
+    NATS["NATS<br/>(Storage Queue)"]
+    Arctic["Snowflake Arctic<br/>Embeddings"]
+    Qdrant["Qdrant<br/>(ANN + BM42)"]
+    OtherModels["Other embedding models"]
 
-     [ SNOWFLAKE ARCTIC is pluggable, can swap out for other models. ]
+    %% API Gateway
+    subgraph APIGateway["API_GATEWAY (JWT auth, API key swap, endpoint router)"]
+        direction TB
 
-        -->   = Request flow
-        <--   = Data or response flow
+        Search["/search endpoint"]
+        Store["/store endpoint"]
+        GatewayCore["Gateway core"]
 
+        Search -->|"search request"| GatewayCore
+        Store -->|"store request"| GatewayCore
+    end
+
+    %% Redis alternative
+    subgraph RedisDeployment["RediSearch ANN Alternative"]
+        direction TB
+
+        Sentinel["Redis Sentinel"]
+        Master["Redis Master"]
+        Replica["Redis Replica"]
+
+        Sentinel <--> Master
+        Master <--> Replica
+    end
+
+    %% Main flows
+    MySQL -->|"API key lookup"| GatewayCore
+
+    GatewayCore -->|"query embedding request"| Arctic
+    Arctic -->|"query embedding"| GatewayCore
+    GatewayCore -->|"ANN search + BM42 reranking"| Qdrant
+
+    GatewayCore -->|"publish docs"| NATS
+    NATS -->|"subscribed docs"| GatewayCore
+    GatewayCore -->|"document chunking + embedding"| Arctic
+    Arctic -->|"chunk embeddings"| Qdrant
+
+    %% Alternatives / extension points
+    Qdrant -. "can be swapped with" .-> RedisDeployment
+    Arctic -. "pluggable model" .-> OtherModels
 ```
 
 Legend / Flow Details:
