@@ -509,6 +509,23 @@ Stop condition:
 
 Goal: remove framework-specific types from the core client API.
 
+Status: completed on 2026-05-01.
+
+Completed work:
+
+- Added `DisconnectChecker` in [types.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/types.py) as the framework-neutral async disconnect abstraction.
+- Updated the core request path in [client.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/client.py) to use `disconnect_checker: DisconnectChecker | None` instead of FastAPI `Request` objects.
+- Updated resource facades in [resources.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/resources.py) to accept `disconnect_checker` rather than framework-specific request objects.
+- Kept FastAPI awareness inside [integrations/fastapi.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/integrations/fastapi.py), including `disconnect_checker_from_request`.
+- Updated the external gateway wiring in [fastapi.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/fastapi.py), [gateway.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/gateway.py), and [examples/fastapi_app.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/examples/fastapi_app.py) to pass `disconnect_checker` through the integration layer.
+
+Validation notes:
+
+- Compile validation passed for the external package after the disconnect abstraction was in place.
+- Structural checks confirmed that core modules no longer import FastAPI or Starlette types.
+- Wiring checks confirmed that FastAPI entrypoints now adapt `request.is_disconnected()` through `disconnect_checker_from_request` before calling core client paths.
+- A live disconnect-behavior exercise was not run during this pass.
+
 #### Step 1. Introduce a framework-neutral disconnect type
 
 - Add `DisconnectChecker` in `types.py`.
@@ -550,6 +567,23 @@ Stop condition:
 
 Goal: stabilize the most fragile part of the package after the architecture is clean.
 
+Status: completed on 2026-05-01.
+
+Completed work:
+
+- Kept the DNS transport isolated in [transports/dns_cache.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/transports/dns_cache.py) as an internal advanced module.
+- Finalized socket option typing around a dedicated `SocketOptions` alias.
+- Replaced the `assert`-based async stream assumption with an explicit runtime type check in the async transport path.
+- Wrapped private `httpx` and `httpcore` transport internals behind explicit helper functions with clearer compatibility failures.
+- Added version-family guards for the private transport dependency surface and pinned the tested package versions in [requirements.txt](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/requirements.txt): `httpx==0.28.1` and `httpcore==1.0.9`.
+- Kept the DNS transport optional by relying on the lazy import path already introduced in [client.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/client.py).
+
+Validation notes:
+
+- Compile validation passed for the external package after transport hardening.
+- Diagnostics reported no remaining issues in [transports/dns_cache.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/transports/dns_cache.py) or [client.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/client.py).
+- Client construction was exercised successfully both with DNS caching disabled and with DNS caching enabled.
+
 - Fix the socket option typing mismatches in the DNS transport module.
 - Fix the `AsyncResponseStream` typing and behavior concerns.
 - Review whether the transport layer should wrap or adapt sync and async response streams differently.
@@ -572,6 +606,19 @@ Stop condition:
 ### Stage 6: Remove runtime example from core package code
 
 Goal: keep runtime modules focused on runtime behavior.
+
+Status: completed on 2026-05-01.
+
+Completed work:
+
+- Removed the embedded `EXAMPLE_FASTAPI_USAGE` runtime string from the package modules.
+- Moved the example application into [examples/fastapi_app.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/examples/fastapi_app.py).
+- Kept the example outside the root runtime export path so package imports only expose implementation code.
+
+Validation notes:
+
+- The external package compile check passed after the example move.
+- Structural checks confirmed there is no remaining `EXAMPLE_FASTAPI_USAGE` reference in the runtime package code.
 
 - Move `EXAMPLE_FASTAPI_USAGE` into one of:
 	- `examples/fastapi_app.py`

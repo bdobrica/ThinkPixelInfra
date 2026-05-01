@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Optional DNS-caching transport internals for llm_client."""
 
 import asyncio
@@ -5,17 +7,75 @@ import dataclasses
 import ipaddress
 import socket
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any, cast
 
 import httpcore
 import httpx
-from httpcore._backends.auto import AutoBackend as HttpcoreAutoBackend
-from httpx._transports.default import AsyncResponseStream, map_httpcore_exceptions
 
 SocketOptionValue = int | bytes
 SocketOption = tuple[int, int, SocketOptionValue]
 SocketOptions = Sequence[SocketOption]
+
+_SUPPORTED_HTTPX_VERSION_PREFIXES = ("0.28.",)
+_SUPPORTED_HTTPCORE_VERSION_PREFIXES = ("1.0.",)
+_TESTED_HTTPX_VERSION = "0.28.1"
+_TESTED_HTTPCORE_VERSION = "1.0.9"
+
+
+def _ensure_supported_transport_versions() -> None:
+    if not any(httpx.__version__.startswith(prefix) for prefix in _SUPPORTED_HTTPX_VERSION_PREFIXES):
+        raise RuntimeError(
+            "DNSCachingAsyncHTTPTransport relies on private httpx internals and only supports "
+            f"httpx {_SUPPORTED_HTTPX_VERSION_PREFIXES!r}; found {httpx.__version__}. "
+            f"Tested version: {_TESTED_HTTPX_VERSION}."
+        )
+
+    if not any(httpcore.__version__.startswith(prefix) for prefix in _SUPPORTED_HTTPCORE_VERSION_PREFIXES):
+        raise RuntimeError(
+            "DNSCachingAsyncHTTPTransport relies on private httpcore internals and only supports "
+            f"httpcore {_SUPPORTED_HTTPCORE_VERSION_PREFIXES!r}; found {httpcore.__version__}. "
+            f"Tested version: {_TESTED_HTTPCORE_VERSION}."
+        )
+
+
+def _build_default_network_backend() -> httpcore.AsyncNetworkBackend:
+    try:
+        from httpcore._backends.auto import AutoBackend as HttpcoreAutoBackend
+    except ImportError as exc:  # pragma: no cover - version-specific private import
+        raise RuntimeError(
+            "DNSCachingAsyncHTTPTransport could not import httpcore AutoBackend. "
+            f"Tested httpcore version: {_TESTED_HTTPCORE_VERSION}."
+        ) from exc
+
+    return cast(httpcore.AsyncNetworkBackend, HttpcoreAutoBackend())
+
+
+@contextmanager
+def _map_private_httpcore_exceptions() -> "Iterator[None]":
+    try:
+        from httpx._transports.default import map_httpcore_exceptions
+    except ImportError as exc:  # pragma: no cover - version-specific private import
+        raise RuntimeError(
+            "DNSCachingAsyncHTTPTransport could not import httpx exception mapping internals. "
+            f"Tested httpx version: {_TESTED_HTTPX_VERSION}."
+        ) from exc
+
+    with map_httpcore_exceptions():
+        yield
+
+
+def _build_async_response_stream(stream: httpcore.AsyncByteStream) -> httpx.AsyncByteStream:
+    try:
+        from httpx._transports.default import AsyncResponseStream
+    except ImportError as exc:  # pragma: no cover - version-specific private import
+        raise RuntimeError(
+            "DNSCachingAsyncHTTPTransport could not import httpx AsyncResponseStream. "
+            f"Tested httpx version: {_TESTED_HTTPX_VERSION}."
+        ) from exc
+
+    return cast(httpx.AsyncByteStream, AsyncResponseStream(stream))
 
 
 @dataclasses.dataclass
@@ -149,7 +209,7 @@ class CachingAsyncNetworkBackend(httpcore.AsyncNetworkBackend):
 
     def __init__(self, *, dns_cache: AsyncDNSCache, backend: httpcore.AsyncNetworkBackend | None = None) -> None:
         self.dns_cache = dns_cache
-        self.backend = backend or HttpcoreAutoBackend()
+        self.backend = backend or _build_default_network_backend()
 
     async def connect_tcp(  # type: ignore[override]
         self,
@@ -196,18 +256,21 @@ class DNSCachingAsyncHTTPTransport(httpx.AsyncBaseTransport):
         verify: bool = True,
         http1: bool = True,
         http2: bool = False,
-        limits: httpx.Limits = httpx.Limits(),
+        limits: httpx.Limits | None = None,
         retries: int = 0,
         local_address: str | None = None,
         socket_options: SocketOptions | None = None,
     ) -> None:
+        _ensure_supported_transport_versions()
+
+        resolved_limits = limits or httpx.Limits()
         self.dns_cache = dns_cache
         self.network_backend = CachingAsyncNetworkBackend(dns_cache=dns_cache)
         self._pool = httpcore.AsyncConnectionPool(
             ssl_context=httpx.create_ssl_context(verify=verify),
-            max_connections=limits.max_connections,
-            max_keepalive_connections=limits.max_keepalive_connections,
-            keepalive_expiry=limits.keepalive_expiry,
+            max_connections=resolved_limits.max_connections,
+            max_keepalive_connections=resolved_limits.max_keepalive_connections,
+            keepalive_expiry=resolved_limits.keepalive_expiry,
             http1=http1,
             http2=http2,
             retries=retries,
@@ -217,7 +280,8 @@ class DNSCachingAsyncHTTPTransport(httpx.AsyncBaseTransport):
         )
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        assert isinstance(request.stream, httpx.AsyncByteStream)
+        if not isinstance(request.stream, httpx.AsyncByteStream):
+            raise TypeError("DNSCachingAsyncHTTPTransport requires an async request stream")
 
         req = httpcore.Request(
             method=request.method,
@@ -232,10 +296,10 @@ class DNSCachingAsyncHTTPTransport(httpx.AsyncBaseTransport):
             extensions=request.extensions,
         )
 
-        with map_httpcore_exceptions():
+        with _map_private_httpcore_exceptions():
             resp = await self._pool.handle_async_request(req)
 
-        response_stream = cast(httpx.AsyncByteStream, AsyncResponseStream(resp.stream))
+        response_stream = _build_async_response_stream(resp.stream)
 
         return httpx.Response(
             status_code=resp.status,
