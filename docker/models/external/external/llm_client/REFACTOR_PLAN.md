@@ -464,16 +464,31 @@ Stop condition:
 
 Goal: keep only stable public symbols in the package root.
 
+Status: completed on 2026-05-01.
+
+Completed work:
+
+- Root exports were narrowed to a minimal stable entrypoint in [__init__.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/__init__.py): `LLMClient`, `RetryConfig`, and the public error types.
+- FastAPI helpers remain available from [integrations/fastapi.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/integrations/fastapi.py) instead of the package root.
+- Transport internals remain available from [transports/dns_cache.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/transports/dns_cache.py) instead of the package root.
+- Example code was moved out of the root runtime module into [examples/fastapi_app.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/examples/fastapi_app.py).
+- External gateway callers were already updated to use explicit FastAPI integration imports before this stage was closed.
+
+Validation notes:
+
+- Package compile validation passed after the root export cleanup.
+- Runtime import validation passed after syncing the mirrored `/mnt/c/...` runtime tree used by the active interpreter in this environment.
+
 - Keep root exports for:
 	- `LLMClient`
 	- `RetryConfig`
-	- `LLMClientConfig`
 	- error classes
-	- deadline helpers
 - Stop re-exporting:
 	- FastAPI helpers
 	- transport internals
 	- example code
+	- deadline helpers
+	- `LLMClientConfig`
 
 Update callers in the external gateway:
 

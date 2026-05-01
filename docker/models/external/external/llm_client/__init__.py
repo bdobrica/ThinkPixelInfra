@@ -1,14 +1,7 @@
 """Public package exports for llm_client."""
 
 from .client import LLMClient
-from .config import LLMClientConfig, RetryConfig
-from .deadline import (
-    current_deadline,
-    remaining_budget_seconds,
-    reset_deadline,
-    set_deadline_after_ms,
-    set_deadline_at,
-)
+from .config import RetryConfig
 from .errors import (
     LLMClientError,
     LLMConfigurationError,
@@ -17,16 +10,10 @@ from .errors import (
 )
 
 __all__ = [
-    "current_deadline",
     "LLMClient",
-    "LLMClientConfig",
     "LLMClientError",
     "LLMConfigurationError",
     "LLMDeadlineExceeded",
     "LLMProviderError",
-    "remaining_budget_seconds",
-    "reset_deadline",
     "RetryConfig",
-    "set_deadline_after_ms",
-    "set_deadline_at",
 ]
