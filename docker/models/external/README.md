@@ -1,11 +1,11 @@
 # External Embeddings Gateway
 
-The external model service is an embeddings gateway that keeps the same `/infer` request and response contract as the local embedding services, but delegates dense vector generation to a remote provider. The current safe default is OpenAI `text-embedding-3-small` for dense vectors, with locally generated lexical sparse vectors so downstream semantic search code can keep consuming the e5-compatible response shape.
+The external model service is an embeddings gateway that keeps the same `/infer` request and response contract as the local embedding services, but delegates dense vector generation to a remote provider. The current safe default is OpenAI `text-embedding-3-small` for dense vectors, with BM25 sparse vectors so downstream semantic search code can keep consuming the e5-compatible response shape.
 
 ## Behavior
 
 - Dense vectors come from the configured provider.
-- Sparse vectors are generated locally from lemmatized tokens and normalized lexical weights.
+- Sparse vectors have BM25 weights.
 - `mode` stays split between `search` and `store` for compatibility, even when both modes currently use empty prefixes.
 - Language detection, sentence splitting, and sparse-vector preparation run off the event loop in a bounded thread pool.
 
@@ -37,6 +37,20 @@ The external model service is an embeddings gateway that keeps the same `/infer`
 - `MODEL_STORE_PREFIX`: Prefix prepended in `store` mode. Default: empty string
 - `MODEL_LANGUAGES`: Allowed languages for spaCy processing. Default: `en`
 - `MODEL_LANGUAGE_DETECTION_PATH`: Path to the fastText language detection model. Default: `/app/fasttext/lid.176.bin`
+
+## Resources
+
+Memory and CPU usage of the container running the model:
+
+```
+CONTAINER ID   NAME          CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O        PIDS
+c69182322bbf   strange_poincare             0.22%     259.3MiB / 15.54GiB   1.63%     59.8kB / 44.2kB   3.51MB / 152kB    13
+```
+
+## Measured Latency
+
+- startup: 2.50s
+- single predict: 0.18s
 
 ## Example
 

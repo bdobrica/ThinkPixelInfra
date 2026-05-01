@@ -1,4 +1,8 @@
-"""FastAPI integration helpers for llm_client."""
+"""FastAPI integration helpers for :mod:`external.llm_client`.
+
+This module keeps framework-specific request handling and exception translation
+outside of the core client package.
+"""
 
 import asyncio
 from typing import Any
@@ -19,14 +23,19 @@ from ..types import DisconnectChecker
 
 
 def disconnect_checker_from_request(request: Request) -> DisconnectChecker:
+    """Adapt :class:`fastapi.Request` disconnect state to :data:`DisconnectChecker`.
+
+    :param request: Incoming FastAPI request.
+    :returns: Async callable that reports whether the client has disconnected.
+    """
     return request.is_disconnected
 
 
 class DeadlineMiddleware(BaseHTTPMiddleware):
-    """
-    Parses a client TTL header and stores an absolute deadline in a ContextVar.
+    """Translate a timeout header into the shared deadline context.
 
-    Example:
+    Example::
+
         app.add_middleware(
             DeadlineMiddleware,
             header_name="X-Request-Timeout-Ms",
@@ -42,12 +51,26 @@ class DeadlineMiddleware(BaseHTTPMiddleware):
         overhead_ms: int = 100,
         max_timeout_ms: int | None = None,
     ) -> None:
+        """Configure deadline parsing middleware.
+
+        :param app: Wrapped ASGI application.
+        :param header_name: Request header containing timeout milliseconds.
+        :param overhead_ms: Milliseconds reserved before the upstream call begins.
+        :param max_timeout_ms: Optional upper bound applied to supplied timeout values.
+        """
         super().__init__(app)
         self.header_name = header_name
         self.overhead_ms = overhead_ms
         self.max_timeout_ms = max_timeout_ms
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
+        """Apply the request deadline while processing a FastAPI request.
+
+        :param request: Current FastAPI request.
+        :param call_next: Downstream middleware or route handler.
+        :returns: Response returned by the downstream application.
+        :raises fastapi.HTTPException: If the timeout header is malformed.
+        """
         raw = request.headers.get(self.header_name)
         timeout_ms: int | None = None
 
@@ -72,7 +95,12 @@ class DeadlineMiddleware(BaseHTTPMiddleware):
 
 
 async def llm_client_from_request(request: Request) -> Any:
-    """Dependency helper: app.state.llm must be set in lifespan."""
+    """Resolve the shared client instance from ``app.state``.
+
+    :param request: FastAPI request whose application state stores the client.
+    :returns: Client instance stored in ``request.app.state.llm``.
+    :raises RuntimeError: If the application state does not expose ``llm``.
+    """
     client = getattr(request.app.state, "llm", None)
     if client is None:
         raise RuntimeError("app.state.llm is not configured")
@@ -80,15 +108,11 @@ async def llm_client_from_request(request: Request) -> Any:
 
 
 def translate_llm_exception(exc: BaseException) -> None:
-    """
-    Optional helper for FastAPI endpoints.
+    """Translate client exceptions into FastAPI-friendly HTTP errors.
 
-    Usage:
-        try:
-            return await llm.responses.create(...)
-        except Exception as exc:
-            translate_llm_exception(exc)
-            raise
+    :param exc: Original exception raised during client processing.
+    :raises fastapi.HTTPException: For client and provider failures that should be surfaced over HTTP.
+    :raises BaseException: Re-raises ``exc`` unchanged when translation is not appropriate.
     """
     if HTTPException is None:
         raise exc

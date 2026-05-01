@@ -1,4 +1,16 @@
-"""Public package exports for llm_client."""
+"""Public package exports for :mod:`external.llm_client`.
+
+This package exposes the minimal stable entrypoint intended for callers that only
+need the core client surface.
+
+:exports:
+    - :class:`.LLMClient`
+    - :class:`.RetryConfig`
+    - :class:`.LLMClientError`
+    - :class:`.LLMConfigurationError`
+    - :class:`.LLMDeadlineExceeded`
+    - :class:`.LLMProviderError`
+"""
 
 from .client import LLMClient
 from .config import RetryConfig

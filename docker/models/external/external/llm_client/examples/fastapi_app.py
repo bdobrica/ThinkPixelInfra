@@ -1,4 +1,8 @@
-"""Example FastAPI integration for llm_client."""
+"""Example FastAPI application for :mod:`external.llm_client`.
+
+This module is intentionally illustrative and is not imported by the core client
+package at runtime.
+"""
 
 from contextlib import asynccontextmanager
 
@@ -16,6 +20,11 @@ from ..integrations.fastapi import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Create and dispose of the shared client used by the example app.
+
+    :param app: FastAPI application whose ``state`` will store the shared client.
+    :yields: Control back to FastAPI while the example app is serving requests.
+    """
     app.state.llm = LLMClient.from_env(
         max_connections=512,
         max_keepalive_connections=128,
@@ -32,6 +41,7 @@ async def lifespan(app: FastAPI):
     await app.state.llm.aclose()
 
 
+#: Example FastAPI application wired to :class:`LLMClient`.
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     DeadlineMiddleware,
@@ -46,6 +56,13 @@ async def ask(
     request: Request,
     llm: LLMClient = Depends(llm_client_from_request),
 ):
+    """Issue a sample response request through the shared client.
+
+    :param request: Incoming FastAPI request used for disconnect propagation.
+    :param llm: Shared client instance injected from application state.
+    :returns: Parsed JSON response from the upstream model provider.
+    :raises fastapi.HTTPException: If the helper translates an upstream client error.
+    """
     try:
         return await llm.responses.create(
             model="gpt-4.1-mini",
