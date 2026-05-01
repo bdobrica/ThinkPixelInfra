@@ -3,9 +3,23 @@
 import asyncio
 from typing import Any
 
+try:
+    from fastapi import HTTPException, Request
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import Response
+except Exception:  # pragma: no cover - keeps non-FastAPI usage importable
+    HTTPException = None  # type: ignore[assignment]
+    Request = Any  # type: ignore[misc,assignment]
+    BaseHTTPMiddleware = object  # type: ignore[assignment]
+    Response = Any  # type: ignore[misc,assignment]
+
 from ..deadline import reset_deadline, set_deadline_after_ms
 from ..errors import LLMClientError, LLMDeadlineExceeded, LLMProviderError
-from ..types import BaseHTTPMiddleware, HTTPException, Request, Response
+from ..types import DisconnectChecker
+
+
+def disconnect_checker_from_request(request: Request) -> DisconnectChecker:
+    return request.is_disconnected
 
 
 class DeadlineMiddleware(BaseHTTPMiddleware):

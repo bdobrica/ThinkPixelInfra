@@ -4,10 +4,11 @@ EXAMPLE_FASTAPI_USAGE = r"""
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 
-from llm_client_first_pass import (
+from llm_client_first_pass.client import LLMClient
+from llm_client_first_pass.config import RetryConfig
+from llm_client_first_pass.integrations.fastapi import (
     DeadlineMiddleware,
-    LLMClient,
-    RetryConfig,
+    disconnect_checker_from_request,
     llm_client_from_request,
     translate_llm_exception,
 )
@@ -46,7 +47,7 @@ async def ask(
         return await llm.responses.create(
             model="gpt-4.1-mini",
             input="Say hello in one sentence.",
-            request=request,
+            disconnect_checker=disconnect_checker_from_request(request),
         )
     except Exception as exc:
         translate_llm_exception(exc)

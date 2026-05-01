@@ -22,7 +22,9 @@ from .config import (
     MODEL_PROVIDER_RETRY_MAX_RETRIES,
     MODEL_PROVIDER_TIMEOUT_SECONDS,
 )
-from .llm_client import LLMClient, RetryConfig
+from .llm_client.client import LLMClient
+from .llm_client.config import RetryConfig
+from .llm_client.types import DisconnectChecker
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,11 @@ class EmbeddingsGateway:
         self.model = model
         self.batch_size = batch_size
 
-    async def embed_texts(self, texts: Sequence[str], request: Any | None = None) -> list[list[float]]:
+    async def embed_texts(
+        self,
+        texts: Sequence[str],
+        disconnect_checker: DisconnectChecker | None = None,
+    ) -> list[list[float]]:
         if self.provider != "openai":
             raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -49,13 +55,13 @@ class EmbeddingsGateway:
                 model=self.model,
                 input=batch,
                 encoding_format="float",
-                request=request,
+                disconnect_checker=disconnect_checker,
             )
             embeddings.extend(_extract_embeddings(response, expected_count=len(batch)))
         return embeddings
 
-    async def ping(self, request: Any | None = None) -> None:
-        await self.embed_texts([MODEL_PING_TEXT], request=request)
+    async def ping(self, disconnect_checker: DisconnectChecker | None = None) -> None:
+        await self.embed_texts([MODEL_PING_TEXT], disconnect_checker=disconnect_checker)
 
 
 def create_llm_client() -> LLMClient:

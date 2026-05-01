@@ -23,7 +23,11 @@ from .config import (
     MODEL_PREPROCESS_THREADS,
 )
 from .gateway import create_embeddings_gateway, create_llm_client
-from .llm_client import DeadlineMiddleware, translate_llm_exception
+from .llm_client.integrations.fastapi import (
+    DeadlineMiddleware,
+    disconnect_checker_from_request,
+    translate_llm_exception,
+)
 from .postprocess import build_results
 from .preprocess import prepare_text_items
 
@@ -90,6 +94,7 @@ async def lifespan(app: FastAPI):
 async def infer(payload: InferenceRequest, request: Request) -> InferenceResponse:
     start_time = time.perf_counter()
     text_items = [item.model_dump() for item in payload.text_items]
+    disconnect_checker = disconnect_checker_from_request(request)
 
     try:
         prepared_items = await _run_in_executor(
@@ -106,7 +111,7 @@ async def infer(payload: InferenceRequest, request: Request) -> InferenceRespons
 
         dense_vectors = await request.app.state.embeddings_gateway.embed_texts(
             [item.get("text", "") for item in prepared_items],
-            request=request,
+            disconnect_checker=disconnect_checker,
         )
         results = await _run_in_executor(
             request.app.state.preprocess_executor,
@@ -130,7 +135,7 @@ async def ping(request: Request) -> SuccessResponse:
         return SuccessResponse()
 
     try:
-        await request.app.state.embeddings_gateway.ping(request=request)
+        await request.app.state.embeddings_gateway.ping(disconnect_checker=disconnect_checker_from_request(request))
     except Exception as exc:
         translate_llm_exception(exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

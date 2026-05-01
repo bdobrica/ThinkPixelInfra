@@ -27,7 +27,7 @@ from .errors import (
 )
 from .resources import ChatCompletionsResource, EmbeddingsResource, ResponsesResource
 from .transports.dns_cache import AsyncDNSCache, DNSCachingAsyncHTTPTransport
-from .types import Request
+from .types import DisconnectChecker
 
 
 class LLMClient:
@@ -131,7 +131,7 @@ class LLMClient:
         path: str,
         *,
         json_body: Mapping[str, Any] | None = None,
-        request: Request | None = None,
+        disconnect_checker: DisconnectChecker | None = None,
         headers: Mapping[str, str] | None = None,
         timeout_ms: int | None = None,
     ) -> dict[str, Any]:
@@ -147,7 +147,7 @@ class LLMClient:
                 method,
                 path,
                 json_body=json_body,
-                request=request,
+                disconnect_checker=disconnect_checker,
                 headers=headers,
             )
         finally:
@@ -160,7 +160,7 @@ class LLMClient:
         path: str,
         *,
         json_body: Mapping[str, Any] | None,
-        request: Request | None,
+        disconnect_checker: DisconnectChecker | None,
         headers: Mapping[str, str] | None,
     ) -> dict[str, Any]:
         cfg = self.config.retry
@@ -170,15 +170,15 @@ class LLMClient:
         while True:
             self._raise_if_no_budget()
 
-            if request is not None and await request.is_disconnected():
-                raise asyncio.CancelledError("FastAPI client disconnected before LLM request started")
+            if disconnect_checker is not None and await disconnect_checker():
+                raise asyncio.CancelledError("Client disconnected before LLM request started")
 
             try:
                 response = await self._send_once(
                     method,
                     path,
                     json_body=json_body,
-                    request=request,
+                    disconnect_checker=disconnect_checker,
                     headers=headers,
                 )
 
@@ -219,7 +219,7 @@ class LLMClient:
                     f"remaining={remaining:.3f}s backoff={backoff_seconds:.3f}s"
                 ) from last_error
 
-            await self._sleep_with_disconnect_watch(backoff_seconds, request)
+            await self._sleep_with_disconnect_watch(backoff_seconds, disconnect_checker)
             attempt += 1
 
     async def _send_once(
@@ -228,7 +228,7 @@ class LLMClient:
         path: str,
         *,
         json_body: Mapping[str, Any] | None,
-        request: Request | None,
+        disconnect_checker: DisconnectChecker | None,
         headers: Mapping[str, str] | None,
     ) -> httpx.Response:
         timeout = self._timeout_for_current_budget()
@@ -240,11 +240,11 @@ class LLMClient:
             timeout=timeout,
         )
 
-        if request is None:
+        if disconnect_checker is None:
             return await call_coro
 
         provider_task = asyncio.create_task(call_coro)
-        disconnect_task = asyncio.create_task(self._wait_for_disconnect(request))
+        disconnect_task = asyncio.create_task(self._wait_for_disconnect(disconnect_checker))
 
         try:
             done, pending = await asyncio.wait(
@@ -258,7 +258,7 @@ class LLMClient:
                     await provider_task
                 except asyncio.CancelledError:
                     pass
-                raise asyncio.CancelledError("FastAPI client disconnected during LLM request")
+                raise asyncio.CancelledError("Client disconnected during LLM request")
 
             disconnect_task.cancel()
             return await provider_task
@@ -267,26 +267,34 @@ class LLMClient:
                 if not task.done():
                     task.cancel()
 
-    async def _wait_for_disconnect(self, request: Request, poll_interval_seconds: float = 0.05) -> bool:
+    async def _wait_for_disconnect(
+        self,
+        disconnect_checker: DisconnectChecker,
+        poll_interval_seconds: float = 0.05,
+    ) -> bool:
         while True:
-            if await request.is_disconnected():
+            if await disconnect_checker():
                 return True
             await asyncio.sleep(poll_interval_seconds)
 
-    async def _sleep_with_disconnect_watch(self, seconds: float, request: Request | None) -> None:
+    async def _sleep_with_disconnect_watch(
+        self,
+        seconds: float,
+        disconnect_checker: DisconnectChecker | None,
+    ) -> None:
         if seconds <= 0:
             return
 
-        if request is None:
+        if disconnect_checker is None:
             await asyncio.sleep(seconds)
             return
 
         sleep_task = asyncio.create_task(asyncio.sleep(seconds))
-        disconnect_task = asyncio.create_task(self._wait_for_disconnect(request))
+        disconnect_task = asyncio.create_task(self._wait_for_disconnect(disconnect_checker))
         try:
             done, _ = await asyncio.wait({sleep_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED)
             if disconnect_task in done and disconnect_task.result() is True:
-                raise asyncio.CancelledError("FastAPI client disconnected during LLM retry backoff")
+                raise asyncio.CancelledError("Client disconnected during LLM retry backoff")
         finally:
             for task in (sleep_task, disconnect_task):
                 if not task.done():
