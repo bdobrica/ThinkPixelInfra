@@ -638,6 +638,31 @@ Stop condition:
 
 Goal: verify the package is ready to be treated as a standalone library candidate.
 
+Status: completed on 2026-05-01.
+
+Completed work:
+
+- Reviewed the final root export surface and kept it narrowed to `LLMClient`, `RetryConfig`, and the public error types in [__init__.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/__init__.py).
+- Verified FastAPI integration remains optional and isolated in [integrations/fastapi.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/llm_client/integrations/fastapi.py).
+- Verified transport internals remain optional and load only when DNS caching is explicitly enabled.
+- Fixed the enclosing package boundary in [external/__init__.py](/home/bogdan/GitHub/ThinkPixelInfra/docker/models/external/external/__init__.py) so importing `external.llm_client.client` no longer eagerly requires FastAPI.
+
+Validation notes:
+
+- Compile validation passed for the external package.
+- Diagnostics reported no remaining issues in the `external` package or `llm_client` package.
+- Core-only importability was verified in a subprocess with `fastapi` and `starlette` imports explicitly blocked.
+- FastAPI integration importability was verified when FastAPI is installed.
+- DNS transport lazy loading was verified:
+	- not loaded after importing the core client
+	- not loaded after constructing a non-DNS client
+	- loaded only after constructing a DNS-enabled client
+- DNS-cached and non-DNS-cached client construction both succeeded.
+
+Result:
+
+- The `llm_client` package is now in a state that can be extracted with minimal additional redesign.
+
 - Review root exports one final time.
 - Confirm the package can be imported without FastAPI installed if only the core client is used.
 - Confirm FastAPI integration is optional.
