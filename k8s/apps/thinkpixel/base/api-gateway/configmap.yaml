@@ -11,9 +11,11 @@ data:
   API_GATEWAY_MYSQL_PORT: "3306"
   API_GATEWAY_MYSQL_USER: thinkpixel
   API_GATEWAY_MYSQL_DB: thinkpixel
-  API_GATEWAY_VALIDATION_SITE_PATH: "?rest_route=/thinkpixel/v1/validate/"
+  API_GATEWAY_VALIDATION_SITE_PATH: "?rest_route=/searchpixel/v1/validate/"
   API_GATEWAY_VALIDATION_TIMEOUT: 5s
   API_GATEWAY_VALIDATION_MAX_ATTEMPTS: "3"
+  API_GATEWAY_KEY_EXCHANGE_SITE_PATH: "?rest_route=/searchpixel/v1/exchange/"
+  API_GATEWAY_KEY_EXCHANGE_TIMEOUT: 10s
   API_GATEWAY_LOG_FILE_PATH_TEMPLATE: /var/log/api-gateway/requests-%s.jsonl
   API_GATEWAY_LOG_MAX_FILES: "50"
   API_GATEWAY_NATS_URL: nats://nats.nats.svc.dev.thinkpixel.io:4222

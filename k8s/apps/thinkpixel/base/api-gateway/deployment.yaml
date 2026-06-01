@@ -39,7 +39,7 @@ spec:
             name: fluent-bit-config
       containers:
         - name: api-gateway
-          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.6.6
+          image: quay.io/bdobrica/thinkpixel-api-gateway-multi:0.7.0
           ports:
             - containerPort: 8080
           envFrom:
