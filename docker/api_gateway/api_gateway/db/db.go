@@ -156,7 +156,13 @@ func StoreRegistrationData(domain, path, validationToken string, validationToken
 
 	query := `
         INSERT INTO wp_thinkpixel_sites (domain, path, validation_token, validation_token_expires_at, validation_method, validation_status, estimated_pages, average_page_size, st_dev_page_size, status)
-        VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')`
+		VALUES (?, ?, ?, ?, 'http', 'pending', ?, ?, ?, 'suspended')
+		ON DUPLICATE KEY UPDATE
+			validation_token = VALUES(validation_token),
+			validation_token_expires_at = VALUES(validation_token_expires_at),
+			validation_method = VALUES(validation_method),
+			validation_status = VALUES(validation_status),
+			updated_at = NOW()`
 
 	_, err = dbConn.Exec(query, domain, path, validationToken, validationTokenExpiresAt, estimatedPages, averagePageSize, stDevPageSize)
 	if err != nil {
@@ -242,18 +248,24 @@ func ActivateAPIKey(domain, path, apiKey string) error {
 	// or re-query the row after updating. For example:
 	var (
 		siteId, estimatedPages, averagePageSize, stDevPageSize int
+		indexingNode                                           sql.NullString
 	)
 	lookupQuery := `
-        SELECT id, estimated_pages, average_page_size, st_dev_page_size
+        SELECT id, estimated_pages, average_page_size, st_dev_page_size, indexing_node
         FROM wp_thinkpixel_sites
         WHERE api_key = ?
         LIMIT 1
     `
-	err = dbConn.QueryRow(lookupQuery, hashedApiKey).Scan(&siteId, &estimatedPages, &averagePageSize, &stDevPageSize)
+	err = dbConn.QueryRow(lookupQuery, hashedApiKey).Scan(&siteId, &estimatedPages, &averagePageSize, &stDevPageSize, &indexingNode)
 	if err != nil {
 		// Not strictly fatal here, but you may choose to handle differently
 		logger.Errorf("Failed to retrieve site_id: %v", err)
 		return err
+	}
+
+	if indexingNode.Valid && indexingNode.String != "" {
+		logger.Infof("Site %d already assigned to indexing node %s; skipping reassignment", siteId, indexingNode.String)
+		return nil
 	}
 
 	// Estimate the memory needed for the API key and assign it to a Redis master
